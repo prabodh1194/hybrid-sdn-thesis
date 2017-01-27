@@ -11,6 +11,7 @@ from mininet.node import OVSSwitch
 from mininet.topolib import TreeNet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
+import pdb
 
 class legacySwitch( OVSSwitch ):
     def start( self, *args, **kwargs ):
