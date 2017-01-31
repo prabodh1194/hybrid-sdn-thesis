@@ -25,14 +25,14 @@ class MyTopo( Topo ):
         # Add hosts and switches
         h2 = self.addHost('h2', cls=Host, ip='10.0.0.2', defaultRoute=None)
         h1 = self.addHost('h1', cls=Host, ip='10.0.0.1', defaultRoute=None)
+        h3 = self.addHost('h3', cls=Host, ip='10.0.0.3', defaultRoute=None)
         s1 = self.addSwitch( 's1', cls=OVSKernelSwitch, failMode='standalone')
-        s2 = self.addSwitch( 's2', cls=OVSKernelSwitch, failMode='standalone')
 
         # Add links
         hs = {'bw':100}
         self.addLink( h1, s1, cls=TCLink, **hs)
-        self.addLink( s1, s2, cls=TCLink, **hs)
-        self.addLink( h2, s2, cls=TCLink, **hs)
+        self.addLink( h2, s1, cls=TCLink, **hs)
+        self.addLink( h3, s1, cls=TCLink, **hs)
 
 
 topos = { 'mytopo': ( lambda: MyTopo() ) }
