@@ -166,7 +166,6 @@ if __name__ == '__main__':
     info('*** building a tree of depth',args.depth[0],'and fanout',args.fanout[0],'\n')
 
     switchCount = (pow(args.fanout[0],args.depth[0])-1)/(args.fanout[0]-1)
-    data = {}
 
     if args.cli:
 	setLogLevel('info')
@@ -176,38 +175,26 @@ if __name__ == '__main__':
         net.stop()
         exit(0)
 
-    for i in range(switchCount+1):
-        for j in range(i, switchCount):
-            args.switches = []
-            print i,j
-            for k in range(i,j+1):
-                args.switches += ['s'+str(k+1)]
-            net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
-            c0,hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
+    net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
+    c0,hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
 
-            # setMirrors(switchCount, args.fanout[0])
-            print "Testing",','.join(args.switches)
-            k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
-            startIperf(net,k)
+    # setMirrors(switchCount, args.fanout[0])
+    print "Testing",','.join(args.switches)
+    k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
+    startIperf(net,k)
 
-            # poll for iperfs to die
-            # while True:
-            #     ps = os.popen('ps a').read()
-            #     if 'iperf' not in ps:
-            #         break
+    # poll for iperfs to die
+    while True:
+        ps = os.popen('ps a').read()
+        if 'iperf' not in ps:
+            break
 
-            net.stop()
-            c0.stop()
-            os.system('pkill -f mininet')
+    net.stop()
 
-            while 1:
-                try:
-                    a = os.wait()
-                    if a is None:
-                        break
-                except:
-                    break
+    data = parseDumps(hostCount, k)
 
-            data[k] = parseDumps(hostCount, k)
+    pair = (k,data)
 
-    print data
+    print pair
+
+    exit(0)
