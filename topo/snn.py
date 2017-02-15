@@ -8,7 +8,8 @@ s.bind((HOST,PORT))
 
 while 1:
     data,addr = s.recvfrom(1024)
-    print addr,data
+    print addr
+    print data
     if not data: 
         break
 conn.close()
