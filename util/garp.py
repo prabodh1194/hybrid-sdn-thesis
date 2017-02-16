@@ -2,7 +2,7 @@ from socket import *
 from sys import *
 import pdb
 
-def sendeth(arp_frame, interface = "h3-eth0"):
+def sendeth(arp_frame, interface = "h5-eth0"):
     """Send raw Ethernet packet on interface."""
     s = socket(AF_PACKET, SOCK_RAW)
 

@@ -15,6 +15,6 @@ while True:
     print >>sys.stderr, 'waiting for a connection'
 
     # Receive the data in small chunks and retransmit it
-    data, addr = sock.recvfrom(1024)
+    data, addr = sock.recvfrom(4)
     print >> sys.stderr, 'connection from', addr 
     print >> sys.stderr, 'received "%s"' % data
