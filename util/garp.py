@@ -1,7 +1,8 @@
 from socket import *
+from sys import *
 import pdb
 
-def sendeth(arp_frame, interface = "h1-eth0"):
+def sendeth(arp_frame, interface = "h3-eth0"):
     """Send raw Ethernet packet on interface."""
     s = socket(AF_PACKET, SOCK_RAW)
 
@@ -19,12 +20,12 @@ if __name__ == "__main__":
     # Formulate a Gratuitous ARP
     # https://en.wikipedia.org/wiki/EtherType
     eth_dst = [0xff,0xff,0xff,0xff,0xff,0xff]
-    eth_src = [0x10,0x00,0x00,0x00,0x00,0x01]
+    eth_src = [0x10,0x00,0x00,0x00,0x00,int(argv[1])]
     eth_type = [0x08, 0x06]
     arp_type = [0x00, 0x01, 0x08, 0x00, 0x06, 0x04]
     arp_reply = [0x00, 0x02]
     arp_req = [0x00, 0x01]
-    ip_src = ip_dst = [0x0a,0x00,0x00,0x01]
+    ip_src = ip_dst = [0x0a,0x00,0x00,int(argv[1])]
 
     # arpframe
         ## ETHERNET
