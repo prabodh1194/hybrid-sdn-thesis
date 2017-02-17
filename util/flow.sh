@@ -1,12 +1,12 @@
-sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:01,dl_dst=10:00:00:00:00:02,actions=set_field:00:00:00:00:00:02"->"eth_dst,set_field:10:00:00:00:00:01"->"eth_src,output:1
+sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:01,dl_dst=10:00:00:00:00:02,actions=set_field:00:00:00:00:00:02"->"eth_dst,set_field:10:00:00:00:00:01"->"eth_src,IN_PORT
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:01,dl_dst=10:00:00:00:00:03,actions=set_field:00:00:00:00:00:03"->"eth_dst,set_field:10:00:00:00:00:01"->"eth_src,output:2
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:01,dl_dst=10:00:00:00:00:04,actions=set_field:00:00:00:00:00:04"->"eth_dst,set_field:10:00:00:00:00:01"->"eth_src,output:2
-sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:02,dl_dst=10:00:00:00:00:01,actions=set_field:00:00:00:00:00:01"->"eth_dst,set_field:10:00:00:00:00:02"->"eth_src,output:1
+sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:02,dl_dst=10:00:00:00:00:01,actions=set_field:00:00:00:00:00:01"->"eth_dst,set_field:10:00:00:00:00:02"->"eth_src,IN_PORT
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:02,dl_dst=10:00:00:00:00:03,actions=set_field:00:00:00:00:00:03"->"eth_dst,set_field:10:00:00:00:00:02"->"eth_src,output:2
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=1,dl_src=00:00:00:00:00:02,dl_dst=10:00:00:00:00:04,actions=set_field:00:00:00:00:00:04"->"eth_dst,set_field:10:00:00:00:00:02"->"eth_src,output:2
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:03,dl_dst=10:00:00:00:00:01,actions=set_field:00:00:00:00:00:01"->"eth_dst,set_field:10:00:00:00:00:03"->"eth_src,output:1
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:03,dl_dst=10:00:00:00:00:02,actions=set_field:00:00:00:00:00:02"->"eth_dst,set_field:10:00:00:00:00:03"->"eth_src,output:1
-sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:03,dl_dst=10:00:00:00:00:04,actions=set_field:00:00:00:00:00:04"->"eth_dst,set_field:10:00:00:00:00:03"->"eth_src,output:2
+sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:03,dl_dst=10:00:00:00:00:04,actions=set_field:00:00:00:00:00:04"->"eth_dst,set_field:10:00:00:00:00:03"->"eth_src,IN_PORT
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:04,dl_dst=10:00:00:00:00:01,actions=set_field:00:00:00:00:00:01"->"eth_dst,set_field:10:00:00:00:00:04"->"eth_src,output:1
 sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:04,dl_dst=10:00:00:00:00:02,actions=set_field:00:00:00:00:00:02"->"eth_dst,set_field:10:00:00:00:00:04"->"eth_src,output:1
-sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:04,dl_dst=10:00:00:00:00:03,actions=set_field:00:00:00:00:00:03"->"eth_dst,set_field:10:00:00:00:00:04"->"eth_src,output:2
+sudo ovs-ofctl -O OpenFlow13 add-flow s1 in_port=2,dl_src=00:00:00:00:00:04,dl_dst=10:00:00:00:00:03,actions=set_field:00:00:00:00:00:03"->"eth_dst,set_field:10:00:00:00:00:04"->"eth_src,IN_PORT
