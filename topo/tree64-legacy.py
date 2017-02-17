@@ -129,24 +129,10 @@ def startIperf(net,name):
     num_hosts = len(hosts)
     res = {}
 
-    # start tcpdump on mirrors
-    # for m in mirrors:
-    #     m.cmd('tcpdump -nnvvS udp and net 10.0.0.0/8 > '+str(m)+' &')
-
     for i in range(num_hosts/2):
         h1 = hosts[i]
         h2 = hosts[-i-1]
         h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > servout'+name+str(h1)+' &')
-
-        # We want to close server as soon as the client is done, hence using
-        # this hack to extract the pid of iperf3 server and supplying it to
-        # the iperf3 client to kill after it's done executing
-        # ps = h1.cmdPrint('ps')
-        # b = ''
-        # for line in ps.split('\r\n'):
-        #     b = re.match('\s*([0-9]+).*iperf3',line)
-        #     if b is not None:
-        #         break
 
         # Can not record client side data too
         h2.cmd('iperf3 -c '+h1.IP()+' -f M -b 800M -t 10 &')
