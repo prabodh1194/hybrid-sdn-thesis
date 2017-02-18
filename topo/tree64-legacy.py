@@ -33,7 +33,7 @@ def setMirrors(switchCount, fanout):
     cmd = ''
     ovs = "sudo ovs-vsctl -- set Bridge s{0} mirrors=@m"
     mirr = " -- --id=@eth{0} get Port s{1}-eth{0}"
-    set = " -- --id=@m create Mirror name=mymirror{0} select-dst-port={1} select-src-port={1} output-port=@eth1"
+    setm = " -- --id=@m create Mirror name=mymirror{0} select-dst-port={1} select-src-port={1} output-port=@eth1"
     ports = ''
     mirrors = switchCount
 
@@ -46,9 +46,82 @@ def setMirrors(switchCount, fanout):
         cmd += ovs.format(i+1)
         for j in range(fanout+1):
             cmd += mirr.format(j+1,i+1)
-        cmd += set.format(i+1,ports)
+        cmd += setm.format(i+1,ports)
         info(cmd)
         os.system(cmd)
+
+def close(switch, switches):
+    beg = 0
+    last = len(switches)
+
+    if last == 1:
+        return switches+switches
+    elif last == 2:
+        return switches
+
+    while beg < last:
+        mid = (beg+last)/2
+        if switches[mid] > switch:
+            if switches[mid-1] < switch:
+                return [switches[mid-1], switches[mid]]
+            else:
+                last = mid
+        else:
+            beg = mid
+    return -1
+
+def generateFlows(topo,switches,fanout,numHosts):
+    stdout = sys.stdout
+    # 2 -- output:_ / IN_PORT
+    # 3 -- switch
+    sdn_switch = [int(s[1:]) for s in switches if int(s[1:]) in range(2,2+fanout)]
+    sdn_switch.sort()
+    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {3} dl_src=00:00:00:00:00:{0},dl_dst=10:00:00:00:00:{1},actions=set_field:00:00:00:00:00:{1}"->"eth_dst,set_field:10:00:00:00:00:{0}"->"eth_src,{2}'
+    #sys.stdout = open(FLOW_FILE, 'w+')
+
+    for i in range(0,numHosts):
+        h_src = 'h'+str(i+1)
+        print
+        for j in range(0,numHosts):
+
+            if i == j:
+                continue
+
+            h_dst = 'h'+str(j+1)
+            print h_dst
+            s = topo[topo[h_dst][0]] # distro layer switch
+            port = 'IN_PORT' if topo[h_src][0] == topo[h_dst][0] else 'output:'+ (s[1] if s[0] == topo[topo[h_src][0]][0] else '1')
+
+            if topo[topo[h_src][0]][0] in switches:
+                switch = topo[topo[h_src][0]][0]
+            elif s[0] in switches:
+                switch = s[0]
+            else:
+                switch = close(int(s[0][1:]), sdn_switch)
+                switch = 's'+str(switch[0] if i <= j else switch[1])
+
+            print switch
+            flowadd = flow.format(hex(i+1)[2:].zfill(2), hex(j+1)[2:].zfill(2),port,switch)
+            print flowadd
+
+    sys.stdout = stdout
+
+def printTopoDS(net,switches):
+    topo = {}
+    pattern = "([sh][0-9]+)-eth([0-9]+)"
+    for l in net.links:
+        i1 = re.search(pattern,str(l.intf1)).group(1)
+        i2 = re.search(pattern,str(l.intf2)).group(1)
+        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(2))
+
+    stdout = sys.stdout
+    sys.stdout = open(TOPO_FILE, 'w+')
+    print len(topo)
+    for k in topo:
+        print k,topo[k]
+    print ','.join([s[1:] for s in switches])
+    sys.stdout = stdout
+    return topo
 
 def treeNet(net, depth, fanout, switches):
     '''
@@ -65,9 +138,9 @@ def treeNet(net, depth, fanout, switches):
 
     info( '*** Adding controller\n' )
     c0=net.addController(name='c0',
-                      controller=RemoteController,
-                      protocol='tcp',
-                      port=6633)
+            controller=RemoteController,
+            protocol='tcp',
+            port=6633)
 
     info( '*** Add switches\n')
     switchCount = 1
@@ -79,8 +152,8 @@ def treeNet(net, depth, fanout, switches):
         for j in range(level):
             switchName = 's'+str(switchCount)
             s = net.addSwitch(switchName,
-                          cls=OVSKernelSwitch,
-                          failMode='secure' if switchName in switches else 'standalone')
+                    cls=OVSKernelSwitch,
+                    failMode='secure' if switchName in switches else 'standalone')
 
             # add a mirror port for logging purpose
             # h = net.addHost('hmirror'+str(switchCount), cls=Host, ip='10.0.0.'+str(255-switchCount), defaultRoute=None)
@@ -114,6 +187,10 @@ def treeNet(net, depth, fanout, switches):
             switch.start([])
 
     info( '*** Post configure switches and hosts\n')
+
+    topo = printTopoDS(net, switches)
+    generateFlows(topo,switches,fanout,numHosts)
+
     return c0,numHosts
 
 def startIperf(net,name):
@@ -139,10 +216,16 @@ def startIperf(net,name):
 
 if __name__ == '__main__':
 
+    TOPO_FILE = 'topo_tree_adj_list'
+    FLOW_FILE = 'flow.sh'
+
     parser = argparse.ArgumentParser(description='Run a mininet simulation for tree topology')
     parser.add_argument('-d', '--depth', help='Depth of mininet tree', nargs=1, default=[3], type=int)
     parser.add_argument('-f', '--fanout', help='Number of links on each switch', nargs=1, default=[4], type=int)
-    parser.add_argument('-s', '--switches', help='Names of switches to have SDN. Switches are numbered in level-order of a tree starting from 1. Enter a space seperated list', nargs='*', default={}, type=str)
+    parser.add_argument('-s', '--switches', help='''Names of switches to have
+                        SDN. Switches are numbered in level-order of a tree
+                        starting from 1. Enter a space seperated list''',
+                        nargs='*', default={}, type=str)
     parser.add_argument('-c', '--cli', help='Display CLI on given topology.', action='store_true')
 
     args = parser.parse_args()
@@ -154,7 +237,7 @@ if __name__ == '__main__':
     switchCount = (pow(args.fanout[0],args.depth[0])-1)/(args.fanout[0]-1)
 
     if args.cli:
-	setLogLevel('info')
+        setLogLevel('info')
         net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
         treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
         CLI(net)
