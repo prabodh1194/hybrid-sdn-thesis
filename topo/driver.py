@@ -1,7 +1,8 @@
 #!/usr/bin/python
 import os
 
-f = open("res","w")
+os.system('sudo mn -c')
+f = open("res","w",buffering=0)
 
 for i in range(4):
     for j in range(i,4):

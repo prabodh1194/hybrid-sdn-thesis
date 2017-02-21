@@ -67,6 +67,8 @@ def generateFlows(topo,switches,fanout,numHosts):
     sdn_switch.sort()
     flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {3} dl_src=00:00:00:00:00:{0},dl_dst=10:00:00:00:00:{1},actions=set_field:00:00:00:00:00:{1}"->"eth_dst,set_field:10:00:00:00:00:{0}"->"eth_src,{2}'
     sys.stdout = open(FLOW_FILE, 'w+')
+    printCount = 0
+    printTotal = numHosts*(numHosts-1.0)
 
     # pdb.set_trace()
     for i in range(0,numHosts):
@@ -78,7 +80,7 @@ def generateFlows(topo,switches,fanout,numHosts):
 
             h_src = 'h'+str(i+1)
             h_dst = 'h'+str(j+1)
-            print '>&2 echo \'',h_src,h_dst,'\''
+            #print '>&2 echo \'',h_src,h_dst,'\''
             s = topo[topo[h_dst][0]] # distro layer switch
             # port = 'IN_PORT' if topo[h_src][0] == topo[h_dst][0] else 'output:'+ (s[1] if s[0] == topo[topo[h_src][0]][0] else '2' if mirror else '1')
 
@@ -118,7 +120,7 @@ def generateFlows(topo,switches,fanout,numHosts):
             print flowadd
 
             h_src, h_dst = h_dst, h_src
-            print '>&2 echo \'',h_src,h_dst,'\''
+            # print '>&2 echo \'',h_src,h_dst,'\''
             s = topo[topo[h_dst][0]] # distro layer switch
             # port = 'IN_PORT' if topo[h_src][0] == topo[h_dst][0] else 'output:'+ (s[1] if s[0] == topo[topo[h_src][0]][0] else '2' if mirror else '1')
 
@@ -147,6 +149,10 @@ def generateFlows(topo,switches,fanout,numHosts):
             flowadd = flow.format(hex(j+1)[2:].zfill(2), hex(i+1)[2:].zfill(2),port,switch)
             print flowadd
 
+            printCount += 2
+            print '>&2 printf "%.2f%%\r" ',(100.0*printCount/printTotal)
+
+    print '>&2 echo '
     sys.stdout = stdout
 
 def printTopoDS(net,switches):
@@ -325,7 +331,7 @@ if __name__ == '__main__':
     setLogLevel( 'info' )
     net.pingAll()
     setLogLevel( 'warning' )
-    startIperf(net,k)
+    # startIperf(net,k)
 
     # poll for iperfs to die
     while True:
@@ -337,7 +343,7 @@ if __name__ == '__main__':
 
     data = parseDumps(hostCount, k)
 
-    pair = (k,data)
+    pair = (k,data,sum(data)/len(data))
 
     print pair
 

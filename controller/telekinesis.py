@@ -49,22 +49,9 @@ class SimpleSwitch13(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
-        # install flow to setup fake path
-
+        # sample install flow
         # match = parser.OFPMatch(eth_dst='10:00:00:00:00:01')
         # actions = [parser.OFPActionSetField(eth_src='00:00:00:00:00:01'),parser.OFPActionOutput(1)]
-        # self.add_flow(datapath, 1, match, actions)
-
-        # match = parser.OFPMatch(eth_dst='10:00:00:00:00:02')
-        # actions = [parser.OFPActionSetField(eth_src='00:00:00:00:00:02'),parser.OFPActionOutput(1)]
-        # self.add_flow(datapath, 1, match, actions)
-
-        # match = parser.OFPMatch(eth_dst='10:00:00:00:00:03')
-        # actions = [parser.OFPActionSetField(eth_src='00:00:00:00:00:03'),parser.OFPActionOutput(1)]
-        # self.add_flow(datapath, 1, match, actions)
-
-        # match = parser.OFPMatch(eth_dst='10:00:00:00:00:04')
-        # actions = [parser.OFPActionSetField(eth_src='00:00:00:00:00:04'),parser.OFPActionOutput(1)]
         # self.add_flow(datapath, 1, match, actions)
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
@@ -121,15 +108,15 @@ class SimpleSwitch13(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(out_port)]
 
         # install a flow to avoid packet_in next time
-        # if out_port != ofproto.OFPP_FLOOD:
-        #     match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
-        #     # verify if we have a valid buffer_id, if yes avoid to send both
-        #     # flow_mod & packet_out
-        #     if msg.buffer_id != ofproto.OFP_NO_BUFFER:
-        #         self.add_flow(datapath, 1, match, actions, msg.buffer_id)
-        #         return
-        #     else:
-        #         self.add_flow(datapath, 1, match, actions)
+        if out_port != ofproto.OFPP_FLOOD:
+            match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
+            # verify if we have a valid buffer_id, if yes avoid to send both
+            # flow_mod & packet_out
+            if msg.buffer_id != ofproto.OFP_NO_BUFFER:
+                self.add_flow(datapath, 1, match, actions, msg.buffer_id)
+                return
+            else:
+                self.add_flow(datapath, 1, match, actions)
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
