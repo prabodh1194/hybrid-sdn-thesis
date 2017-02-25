@@ -16,12 +16,11 @@ from mininet.link import TCLink
 import pdb,os,sys,argparse,re,time
 
 def parseDumps(hostCount, name):
-
     res = []
     servers = hostCount/2
     pattern = ".*\s+([0-9\.]*)\s+MBytes/sec.*"
     for i in range(servers):
-        files = open('servout'+name+'h'+str(i+1))
+        files = open('../../../stat/servout'+name+'h'+str(i+1))
 
         for l in files:
             if 'receiver' in l:
@@ -70,7 +69,6 @@ def generateFlows(topo,switches,fanout,numHosts):
     printCount = 0
     printTotal = numHosts*(numHosts-1.0)
 
-    # pdb.set_trace()
     for i in range(0,numHosts):
         print
         for j in range(i,numHosts):
@@ -244,6 +242,7 @@ def treeNet(net, depth, fanout, switches):
             host.setARP(host2.IP(), mac)
 
     info( '*** Starting switches\n')
+
     for switch in net.switches:
 
         # add a mirror port for logging purpose
@@ -281,10 +280,10 @@ def startIperf(net,name):
     for i in range(num_hosts/2):
         h1 = hosts[i]
         h2 = hosts[-i-1]
-        h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > servout'+name+str(h1)+' &')
+        h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > ../../../stat/servout'+name+str(h1)+' &')
 
         # Can not record client side data too
-        h2.cmd('iperf3 -c '+h1.IP()+' -f M -b 800M -t 10 >> cli &')
+        h2.cmd('sleep 2 && iperf3 -uc '+h1.IP()+' -f M -b 800M -t 10 >> ../../../stat/cli &')
 
 if __name__ == '__main__':
 
@@ -300,6 +299,7 @@ if __name__ == '__main__':
                         SDN. Switches are numbered in level-order of a tree
                         starting from 1. Enter a space seperated list''',
                         nargs='*', default={}, type=str)
+    parser.add_argument('-t', '--stats', help='Start TCPdump on all switch interfaces for stats collection purpose', action='store_true')
 
     global mirror
     args = parser.parse_args()
@@ -311,27 +311,31 @@ if __name__ == '__main__':
 
     if args.cli:
         setLogLevel( 'info' )
-        net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
-        treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
-        if args.mirrors:
-            setMirrors(switchCount, args.fanout[0])
-        os.system('sh flow.sh')
+
+    net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
+    c0,hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
+
+    if args.mirrors:
+        setMirrors(switchCount, args.fanout[0])
+
+    print args.stats
+    if args.stats:
+        for switch in net.switches:
+            for i in switch.intfs:
+                switch.cmd('tcpdump -nS -XX -i {0} udp > ../../../stat/{0} &'.format(str(switch.intfs[i])))
+
+    os.system('sh flow.sh')
+
+    if args.cli:
         CLI(net)
         net.stop()
         exit(0)
 
-    net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
-    c0,hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
-    if args.mirrors:
-        setMirrors(switchCount, args.fanout[0])
-
     print "Testing",','.join(args.switches)
-    k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
-    os.system('sh flow.sh')
-    setLogLevel( 'info' )
     net.pingAll()
     setLogLevel( 'warning' )
-    # startIperf(net,k)
+    k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
+    startIperf(net,k)
 
     # poll for iperfs to die
     while True:
