@@ -13,7 +13,7 @@ from mininet.topolib import TreeNet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
-import pdb,os,sys,argparse,re,time
+import pdb,os,sys,argparse,re,time,pprint,json
 
 def parseDumps(hostCount, name):
     res = []
@@ -166,10 +166,7 @@ def printTopoDS(net,switches):
 
     stdout = sys.stdout
     sys.stdout = open(TOPO_FILE, 'w+')
-    print len(topo)
-    for k in topo:
-        print k,topo[k]
-    print ','.join([s[1:] for s in switches])
+    print json.dumps(topo)
     sys.stdout = stdout
     return topo
 

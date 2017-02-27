@@ -1,4 +1,4 @@
-import sys, os, pdb, re, pprint
+import sys, os, pdb, re, pprint, json
 from math import ceil
 
 pattern = "([0-9:.]+) IP ([0-9:.]+) > ([0-9:.]+):"
@@ -19,6 +19,7 @@ print >>sys.stderr, files
 for tcp_file in files:
     f = open('../../../stat/'+tcp_file, 'r')
     print >>sys.stderr, tcp_file
+    tcp_file = tcp_file[1:]
 
     for line in f:
 
@@ -28,7 +29,7 @@ for tcp_file in files:
             t = re.split('[:.]',m.group(1))
             t = map(float,t)
 
-            src = m.group(2)
+            src = m.group(2).split('.')[3]
             dst = m.group(3)
 
             seconds = t[0]*60*60*1000 + t[1]*60*1000 + t[2]*1000 + t[3]/1000.0
@@ -52,67 +53,56 @@ for tcp_file in files:
                 else:
                     d[packet][src][tcp_file] = seconds
 
-pprint.pprint(d)
+# pprint.pprint(d)
 
-# depth  = int(sys.argv[1])
-# fanout = int(sys.argv[2])
-# 
-# hosts = pow(fanout, depth)
-# switches = (pow(factor,depth)-1)/(fanout-1)
-# 
-# traversal = {}
-# 
-# for i in range(depth):
-#     factor = float(pow(fanout,depth-1-i))
-#     offset = pow(fanout,depth-i)
-#     # pdb.set_trace()
-#     for j in range(1+hosts/2,hosts+1):
-#         h = j/offset
-#         h = h*offset
-#         h = j-h
-# 
-#         ceil(j/offset)
-# 
-#         if j not in traversal:
-#             traversal[j] = []
-#         traversal[j] = ['s{0}-eth{1}'.format(i+1,str(int(ceil(h/factor))+1 if i!=0 else 0))]+traversal[j]
-# 
-#         h = (j-hosts/2)/offset
-#         h = h*offset
-#         h = j-h-hosts/2
-#         traversal[j] += ['s{0}-eth{1}'.format(i+1,str(int(ceil(h/factor))+1 if i!=0 else 0))]
-# pprint.pprint(traversal)
+TOPO_FILE = 'topo_tree_adj_list'
 
-traversal = {
- 33: [],
- 34: [],
- 35: [],
- 36: [],
- 37: [],
- 38: [],
- 39: [],
- 40: [],
- 41: [],
- 42: [],
- 43: [],
- 44: [],
- 45: [],
- 46: [],
- 47: [],
- 48: [],
- 49: [],
- 50: [],
- 51: [],
- 52: [],
- 53: [],
- 54: [],
- 55: [],
- 56: [],
- 57: [],
- 58: [],
- 59: [],
- 60: [],
- 61: [],
- 62: [],
- 63: [],
- 64: []}
+f = open(TOPO_FILE)
+topo = json.load(f)
+
+depth = int(sys.argv[1])
+fanout = int(sys.argv[2])
+hosts = pow(fanout, depth)
+
+traversal = {}
+
+for i in range(1+hosts/2,hosts+1):
+    if i not in traversal:
+        traversal[str(i)] = []
+
+    k = 'h'+str(i)
+    while True:
+        if k not in topo:
+            break
+        traversal[str(i)] += ['{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1]))]
+        k = topo[k][0]
+
+    k = 'h'+str(i-hosts/2)
+    idx = len(traversal[str (i)])
+
+    while True:
+        if k not in topo:
+            break
+        traversal[str (i)].insert(idx,'{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1])))
+        k = topo[k][0]
+
+print >> sys.stderr, traversal
+
+drop = {}
+link = {}
+
+for packet in d:
+    for host in d[packet]:
+        for i in range(len(traversal[str(host)])):
+            intf = traversal[host][i]
+            if intf in d[packet][host]:
+                eth1 = re.sub('eth[0-9]','eth1',intf)
+                if eth1 not in d[packet][host]:
+                    if eth1.split('-')[0] not in drop:
+                        drop[eth1.split('-')[0]] = 1
+                    else:
+                        drop[eth1.split('-')[0]] += 1
+            else:
+                break
+
+pprint.pprint(drop)
