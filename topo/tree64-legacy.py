@@ -279,11 +279,12 @@ def startIperf(net,name):
 
     for i in range(num_hosts/2):
         h1 = hosts[i]
-        h2 = hosts[-i-1]
-        h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > ../../../stat/servout'+name+str(h1)+' &')
+        h2 = hosts[i+num_hosts/2]
+        # h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > ../../../stat/servout'+name+str(h1)+' &')
+        h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        h2.cmd('sleep 2 && iperf3 -uc '+h1.IP()+' -f M -b 800M -t 10 >> ../../../stat/cli &')
+        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 5120 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
 
 if __name__ == '__main__':
 
@@ -322,7 +323,7 @@ if __name__ == '__main__':
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -nS -XX -i {0} udp > ../../../stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -nS -XX -i {0} net 10.0.0.0/24 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
 
     os.system('sh flow.sh')
 
@@ -340,15 +341,15 @@ if __name__ == '__main__':
     # poll for iperfs to die
     while True:
         ps = os.popen('ps a').read()
-        if 'iperf' not in ps:
+        if 'ITG' not in ps:
             break
 
     net.stop()
 
-    data = parseDumps(hostCount, k)
+    # data = parseDumps(hostCount, k)
 
-    pair = (k,data,sum(data)/len(data))
+    # pair = (k,data,sum(data)/len(data))
 
-    print pair
+    # print pair
 
     exit(0)
