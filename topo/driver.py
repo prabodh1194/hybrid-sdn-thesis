@@ -16,4 +16,4 @@ for i in range(4):
         os.system('pwd')
         os.system('python parser.py 3 4 {0} >> ../../../stat/pack_info'.format(s.replace(' ',',')))
         os.system('cd ../../../stat/ && ls -1 | grep "recv" | while read var; do ITGDec $var | grep -i "from\|to\|drop"; echo; done >> drop')
-        # os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do sudo rm $var; done')
+        os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do sudo rm $var; done')
