@@ -281,7 +281,7 @@ def startIperf(net,name):
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 5120 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
 
 if __name__ == '__main__':
 
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -nS -XX -i {0} net 10.0.0.0/24 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/24 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
 
     os.system('sh flow.sh')
 
@@ -336,8 +336,11 @@ if __name__ == '__main__':
     startIperf(net,k)
 
     # poll for iperfs to die
+    time.sleep(10)
     while True:
-        ps = os.popen('ps a').read()
+        ps = os.popen('ps -a').read()
+        if 'ITGSend' not in ps:
+            os.system('sleep 2 && pkill ITGRecv')
         if 'ITG' not in ps:
             break
 
