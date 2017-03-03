@@ -1,4 +1,4 @@
-import sys, os, pdb, re, pprint, json
+import sys, os, re, pprint, json
 from math import ceil
 
 pattern = "([0-9:.]+) IP ([0-9:.]+) > ([0-9:.]+):"
@@ -48,27 +48,29 @@ for tcp_file in files:
             # print line[14:18]
 
             if packet not in d:
-                d[packet] = {src:{tcp_file:seconds}}
+                d[packet] = {src:{tcp_file:[seconds]}}
             else:
                 if src not in d[packet]:
-                     d[packet][src] = {tcp_file:seconds}
+                     d[packet][src] = {tcp_file:[seconds]}
                 else:
-                    d[packet][src][tcp_file] = seconds
+                    d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [seconds]
 
 pprint.pprint(d)
 
 TOPO_FILE = 'topo_tree_adj_list'
+FLOW_FILE = 'flows'
 
 f = open(TOPO_FILE)
 topo = json.load(f)
+
+f = open(FLOW_FILE)
+flows = json.load(f)
 
 depth = int(sys.argv[1])
 fanout = int(sys.argv[2])
 hosts = pow(fanout, depth)
 
 traversal = {}
-
-pdb.set_trace()
 
 for i in range(1+hosts/2,hosts+1):
     if i not in traversal:
@@ -83,8 +85,13 @@ for i in range(1+hosts/2,hosts+1):
             traversal[str(i)] += ['{0}-eth1'.format(str(topo[k][0]))]
         k = topo[k][0]
 
+    k = 'h'+str(i)+"-"+'h'+str(i-hosts/2)
+    if k in flows:
+        flow_sw = str(flows[k])
+        traversal[str(i)] += ['s1-eth{0}'.format(str(topo[flow_sw][1])),'{0}-eth1'.format(flow_sw),'{0}-eth1'.format(flow_sw),'s1-eth{0}'.format(str(topo[flow_sw][1]))]
+
     k = 'h'+str(i-hosts/2)
-    idx = len(traversal[str (i)])
+    idx = len(traversal[str(i)])
 
     while True:
         if k not in topo:
@@ -98,7 +105,8 @@ print >> sys.stderr, traversal
 
 drop_file = open('../../../stat/drop','a')
 
-drop = {}
+totalDrop = 0
+drop = {'totalDrop':0}
 link_speed = {}
 link_latency = {}
 
@@ -109,6 +117,7 @@ for packet in d: # go through every recorded packet
             eth1 = traversal[host][i+1]
             if intf in d[packet][host] and eth1 not in d[packet][host]:
                 # print >> drop_file,intf,packet,host
+                drop['totalDrop'] += 1
                 if eth1.split('-')[0] not in drop:
                     drop[eth1.split('-')[0]] = 1
                 else:
@@ -120,7 +129,7 @@ for packet in d: # go through every recorded packet
 
                     if link not in link_speed:
                         link_speed[link] = []
-                    link_speed[link] += [d[packet][host][intf] - d[packet][host][traversal[host][i-1]]]
+                    link_speed[link] += [d[packet][host][intf].pop(0) - d[packet][host][traversal[host][i-1]].pop(0)]
 
 for link in link_speed:
     latency = sum(link_speed[link])/len(link_speed[link])

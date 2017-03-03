@@ -13,20 +13,7 @@ from mininet.topolib import TreeNet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
-import pdb,os,sys,argparse,re,time,pprint,json
-
-def parseDumps(hostCount, name):
-    res = []
-    servers = hostCount/2
-    pattern = ".*\s+([0-9\.]*)\s+MBytes/sec.*"
-    for i in range(servers):
-        files = open('../../../stat/servout'+name+'h'+str(i+1))
-
-        for l in files:
-            if 'receiver' in l:
-                m = re.match(pattern,l)
-                res += [float(m.group(1))]
-    return res
+import os,sys,argparse,re,time,pprint,json
 
 def setMirrors(switchCount, fanout):
     cmd = ''
@@ -59,16 +46,20 @@ def close(switch, switches):
     return switches[-1]
 
 def generateFlows(topo,switches,fanout,numHosts):
+
+    flows = {}
     stdout = sys.stdout
+    sys.stdout = open(FLOW_FILE, 'w+')
+    if len(switches) == 0:
+        return
     # 2 -- output:_ / IN_PORT
     # 3 -- switch
     sdn_switch = [int(s[1:]) for s in switches if int(s[1:]) in range(2,2+fanout)]
     sdn_switch.sort()
-    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {3} dl_src=00:00:00:00:00:{0},dl_dst=10:00:00:00:00:{1},actions=set_field:00:00:00:00:00:{1}"->"eth_dst,set_field:10:00:00:00:00:{0}"->"eth_src,{2}'
-    sys.stdout = open(FLOW_FILE, 'w+')
     printCount = 0
     printTotal = numHosts*(numHosts-1.0)
 
+    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {3} dl_src=00:00:00:00:00:{0},dl_dst=10:00:00:00:00:{1},actions=set_field:00:00:00:00:00:{1}"->"eth_dst,set_field:10:00:00:00:00:{0}"->"eth_src,{2}'
     for i in range(0,numHosts):
         print
         for j in range(i,numHosts):
@@ -80,8 +71,8 @@ def generateFlows(topo,switches,fanout,numHosts):
             h_dst = 'h'+str(j+1)
             #print '>&2 echo \'',h_src,h_dst,'\''
             s = topo[topo[h_dst][0]] # distro layer switch
-            # port = 'IN_PORT' if topo[h_src][0] == topo[h_dst][0] else 'output:'+ (s[1] if s[0] == topo[topo[h_src][0]][0] else '2' if mirror else '1')
 
+            #find a candidate OF switch to install a flow
             if topo[topo[h_src][0]][0] in switches: # src host is connected to an OF switch
                 switch = topo[topo[h_src][0]][0]
             elif s[0] in switches: # dst host is connected to an OF switch
@@ -91,7 +82,10 @@ def generateFlows(topo,switches,fanout,numHosts):
                 switch = close(s_no, sdn_switch)
                 # switch = 's'+str(switch[0] if abs(switch[0]-s_no) <= abs(switch[1]-s_no) else switch[1])
                 switch = 's'+str(switch)
+                flows[h_src+"-"+h_dst] = switch
 
+            # determine a port number on which the flow outputs the packet after
+            # processing
             # there can be a number of cases in which a packet is re-directed to an OF port.
 
             # both src and dst are under same distro switch
@@ -120,7 +114,9 @@ def generateFlows(topo,switches,fanout,numHosts):
             h_src, h_dst = h_dst, h_src
             # print '>&2 echo \'',h_src,h_dst,'\''
             s = topo[topo[h_dst][0]] # distro layer switch
-            # port = 'IN_PORT' if topo[h_src][0] == topo[h_dst][0] else 'output:'+ (s[1] if s[0] == topo[topo[h_src][0]][0] else '2' if mirror else '1')
+
+            if topo[topo[h_src][0]][0] in switches: # src host is connected to an OF switch
+                switch = topo[topo[h_src][0]][0]
 
             # there can be a number of cases in which a packet is re-directed to an OF port.
 
@@ -150,19 +146,22 @@ def generateFlows(topo,switches,fanout,numHosts):
             printCount += 2
             print '>&2 printf "%.2f%%\r" ',(100.0*printCount/printTotal)
 
-    print '>&2 echo '
+    print '>&2 echo'
     sys.stdout = stdout
+
+    f = open("flows","w")
+    json.dump(flows, f)
 
 def printTopoDS(net,switches):
     topo = {}
-    pattern = "([sh][0-9]+)-eth([0-9]+)"
+    pattern = "eth([0-9]+)"
     for l in net.links:
 
         if 'mirror' in str(l):
             continue
-        i1 = re.search(pattern,str(l.intf1)).group(1)
-        i2 = re.search(pattern,str(l.intf2)).group(1)
-        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(2))
+        i1 = str(l.intf1.node)
+        i2 = str(l.intf2.node)
+        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(1))
 
     stdout = sys.stdout
     sys.stdout = open(TOPO_FILE, 'w+')
@@ -191,8 +190,8 @@ def treeNet(net, depth, fanout, switches):
 
     info( '*** Add switches\n')
     switchCount = 1
-    hs100 = {'bw':100} #Mbit/s
-    hs1000 = {'bw':1000} #Mbit/s
+    hs100 = {'bw':100,'delay':'10'} #Mbit/s
+    hs1000 = {'bw':1000,'delay':'10'} #Mbit/s
     mirrors = []
     for i in range (depth):
         level = pow(fanout, i)
@@ -236,7 +235,8 @@ def treeNet(net, depth, fanout, switches):
             if str(host) == str(host2):
                 continue
             mac = '10:00:00:00:00:'+hex(int(str(host2)[1:]))[2:].zfill(2)
-            host.setARP(host2.IP(), mac)
+            if len(switches) != 0:
+                host.setARP(host2.IP(), mac)
 
     info( '*** Starting switches\n')
 
@@ -259,7 +259,7 @@ def treeNet(net, depth, fanout, switches):
     topo = printTopoDS(net, switches)
     generateFlows(topo,switches,fanout,numHosts)
 
-    return c0,numHosts
+    return numHosts
 
 def startIperf(net,name):
     hosts = []
@@ -281,7 +281,7 @@ def startIperf(net,name):
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2000 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
 
 if __name__ == '__main__':
 
@@ -311,7 +311,7 @@ if __name__ == '__main__':
         setLogLevel( 'info' )
 
     net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
-    c0,hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
+    hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
 
     if args.mirrors:
         setMirrors(switchCount, args.fanout[0])
@@ -345,11 +345,5 @@ if __name__ == '__main__':
             break
 
     net.stop()
-
-    # data = parseDumps(hostCount, k)
-
-    # pair = (k,data,sum(data)/len(data))
-
-    # print pair
 
     exit(0)
