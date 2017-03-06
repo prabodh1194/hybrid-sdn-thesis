@@ -55,7 +55,6 @@ for tcp_file in files:
                 else:
                     d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [seconds]
 
-pprint.pprint(d)
 
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
@@ -85,7 +84,7 @@ for i in range(1+hosts/2,hosts+1):
             traversal[str(i)] += ['{0}-eth1'.format(str(topo[k][0]))]
         k = topo[k][0]
 
-    k = 'h'+str(i)+"-"+'h'+str(i-hosts/2)
+    k = 'h'+str(i-hosts/2)+"-"+'h'+str(i)
     if k in flows:
         flow_sw = str(flows[k])
         traversal[str(i)] += ['s1-eth{0}'.format(str(topo[flow_sw][1])),'{0}-eth1'.format(flow_sw),'{0}-eth1'.format(flow_sw),'s1-eth{0}'.format(str(topo[flow_sw][1]))]
@@ -141,3 +140,11 @@ print header
 pprint.pprint(drop)
 pprint.pprint(link_latency)
 sys.stdout = stdout
+
+for packet in d: # go through every recorded packet
+    for host in d[packet]: # for every packet, go through every host
+        for k in d[packet][host]:
+            if k not in traversal[host]:
+                d[packet][host][k] = 0
+
+pprint.pprint(d)

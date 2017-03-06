@@ -330,7 +330,7 @@ if __name__ == '__main__':
         exit(0)
 
     print "Testing",','.join(args.switches)
-    net.pingAll()
+    # net.pingAll()
     setLogLevel( 'warning' )
     k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
     startIperf(net,k)

@@ -33,6 +33,10 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
+
+        self.mac_to_port = {}
+        self.logger.info("packet in dpid src dst in_port")
+
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
