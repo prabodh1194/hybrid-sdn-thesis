@@ -8,12 +8,26 @@ Create a 64-host network on legacy switch, and run the CLI on it.
 from mininet.net import Mininet
 from mininet.cli import CLI
 from mininet.node import Controller, RemoteController, OVSController
-from mininet.node import OVSKernelSwitch, OVSSwitch, Host
+from mininet.node import OVSKernelSwitch, OVSSwitch, Host, Node
 from mininet.topolib import TreeNet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
+from math import ceil
 import os,sys,argparse,re,time,pprint,json
+
+class LinuxRouter( Node ):
+    "A Node with IP forwarding enabled."
+    def config( self, **params ):
+        print(params)
+        super( LinuxRouter, self).config( **params )
+        # Enable forwarding on the router
+        self.cmd( 'sysctl net.ipv4.ip_forward=1' )
+
+    def terminate( self ):
+        self.cmd( 'sysctl net.ipv4.ip_forward=0' )
+        super( LinuxRouter, self ).terminate()
+
 
 def setMirrors(switchCount, fanout):
     cmd = ''
@@ -188,11 +202,14 @@ def treeNet(net, depth, fanout, switches):
             port=6633)
 
     info( '*** Add switches\n')
-    switchCount = 1
+
+    router = net.addHost( 's1', cls=LinuxRouter, ip='10.0.1.1/24')
+
+    switchCount = 2
     hs100 = {'bw':100,'delay':'10'} #Mbit/s
     hs1000 = {'bw':1000,'delay':'10'} #Mbit/s
     mirrors = []
-    for i in range (depth):
+    for i in range (1, depth):
         level = pow(fanout, i)
         for j in range(level):
             switchName = 's'+str(switchCount)
@@ -200,23 +217,30 @@ def treeNet(net, depth, fanout, switches):
                     cls=OVSKernelSwitch,
                     failMode='secure' if switchName in switches else 'standalone')
 
-            # # add a mirror port for logging purpose
+            # add a mirror port for logging purpose
             # if mirror:
             #     h = net.addHost('hmirror'+str(switchCount), cls=Host, ip='10.0.0.'+str(255-switchCount), defaultRoute=None)
             #     net.addLink(s, h, cls=TCLink, **hs100)
 
-            if i > 0:
+            if i == 1:
+                net.addLink(s, net.get('s1'),
+                        intfName2='s1-eth{0}'.format(switchCount-1),
+                        params2={'ip':'10.0.{0}.1/24'.format(switchCount-1)})
+
+            if i > 1:
                 prevSwitch = switchCount - j - level/fanout + j/fanout
-                hs = hs1000 if i == 1 else hs100
-                l = net.addLink(s, net.get('s'+str(prevSwitch)), cls=TCLink, **hs)
+                l = net.addLink(s, net.get('s'+str(prevSwitch)), cls=TCLink, **hs100)
 
             switchCount += 1
 
     info( '*** Add hosts\n')
     numHosts = pow(fanout, depth)
     switchOff = 1+(pow(fanout, depth-1)-1)/(fanout-1)
+    division = numHosts/fanout #number of hosts under a distro switch
     for i in range(numHosts):
-        h = net.addHost('h'+str(i+1), cls=Host, ip='10.0.0.'+str(i+1), defaultRoute=None)
+        h = net.addHost('h'+str(i+1),
+                ip='10.0.{0}.{1}/24'.format(int(ceil((i+1.)/division)),str(i+2)),
+                defaultRoute=None)
         net.addLink(h, net.get('s'+str(switchOff+i/fanout)), cls=TCLink, **hs100)
 
     info( '*** Starting network\n')
@@ -224,12 +248,12 @@ def treeNet(net, depth, fanout, switches):
 
     for host in net.hosts:
 
-        if 'mirror' in str(host):
+        if 'mirror' in str(host) or 's1' in str(host):
             continue
         mac = '00:00:00:00:00:'+hex(int(str(host)[1:]))[2:].zfill(2)
         host.setMAC(mac)
         for host2 in net.hosts:
-            if 'mirror' in str(host2):
+            if 'mirror' in str(host2) or 's1' in str(host2):
                 continue
             if str(host) == str(host2):
                 continue
@@ -255,6 +279,14 @@ def treeNet(net, depth, fanout, switches):
 
     info( '*** Post configure switches and hosts\n')
 
+    # add routes
+    for host in net.hosts:
+        if str(host) == 's1' or 'mirror' in str(host):
+            continue
+        else:
+            i = int(str(host)[1:])
+            host.cmd('route add default gw 10.0.{0}.1 h{1}-eth0'.format(int(ceil((i+0.)/division)),i))
+
     topo = printTopoDS(net, switches)
     generateFlows(topo,switches,fanout,numHosts)
 
@@ -265,6 +297,8 @@ def startIperf(net,name):
     mirrors = []
 
     for h in net.hosts:
+        if 's1' in str(h):
+            continue
         if 'mirror' in str(h):
             mirrors += [h]
         else:
