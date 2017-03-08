@@ -46,8 +46,8 @@ def close(switch, switches):
     return switches[-1]
 
 def generateFlows(topo,switches,fanout,numHosts):
-
     flows = {}
+    f = open("flows","w")
     stdout = sys.stdout
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
@@ -149,7 +149,6 @@ def generateFlows(topo,switches,fanout,numHosts):
     print '>&2 echo'
     sys.stdout = stdout
 
-    f = open("flows","w")
     json.dump(flows, f)
 
 def printTopoDS(net,switches):
@@ -281,7 +280,8 @@ def startIperf(net,name):
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2000 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        # h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        h2.cmd('sleep 2 && cd ../../../pcap/10.0.0.{1}_ditg_files/ && sudo ITGSend 10.0.0.{1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),str(h1)[1:]))
 
 if __name__ == '__main__':
 
@@ -321,6 +321,8 @@ if __name__ == '__main__':
         for switch in net.switches:
             for i in switch.intfs:
                 switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/24 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+        # for host in net.hosts:
+        #     host.cmd('tcpdump src {1} or dst {1} and udp -w ../../../stat/{0} &'.format(str(host),host.IP()))
 
     os.system('sh flow.sh')
 

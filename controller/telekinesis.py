@@ -21,6 +21,10 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
+from ryu.lib.packet import arp
+from ryu.lib.packet import tcp
+from ryu.lib.packet import icmp
+from ryu.lib.packet import udp
 import array
 
 class SimpleSwitch13(app_manager.RyuApp):
@@ -35,11 +39,12 @@ class SimpleSwitch13(app_manager.RyuApp):
     def switch_features_handler(self, ev):
 
         self.mac_to_port = {}
-        self.logger.info("packet in dpid src dst in_port")
 
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+
+        self.logger.info("packet in dpid src dst in_port %s",datapath.id)
 
         # install table-miss flow entry
         #
@@ -87,7 +92,13 @@ class SimpleSwitch13(app_manager.RyuApp):
         in_port = msg.match['in_port']
 
         pkt = packet.Packet(msg.data)
+        pkt2 = packet.Packet(pkt.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
+
+        pkt_arp = pkt.get_protocol(arp.arp)
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+        pkt_tcp = pkt.get_protocol(tcp.tcp)
+        pkt_udp = pkt.get_protocol(udp.udp)
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
@@ -98,8 +109,18 @@ class SimpleSwitch13(app_manager.RyuApp):
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
 
+        pkt_type = ""
+        if pkt_arp:
+           pkt_type = "arp"
+        if pkt_icmp:
+           pkt_type = "icmp"
+        if pkt_tcp:
+           pkt_type = "tcp"
+        if pkt_udp:
+           pkt_type = "udp"
+
         if ("33" not in [dst[:2], src[:2]]) and ("ff" not in [dst[:2], src[:2]]): #supress random flood packets
-            self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+            self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
 
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = in_port

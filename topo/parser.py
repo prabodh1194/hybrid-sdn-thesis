@@ -55,15 +55,19 @@ for tcp_file in files:
                 else:
                     d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [seconds]
 
-
+# pprint.pprint(d)
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
 
 f = open(TOPO_FILE)
 topo = json.load(f)
 
+flows = {}
 f = open(FLOW_FILE)
-flows = json.load(f)
+try:
+    flows = json.load(f)
+except:
+    flows = {}
 
 depth = int(sys.argv[1])
 fanout = int(sys.argv[2])
@@ -147,4 +151,4 @@ for packet in d: # go through every recorded packet
             if k not in traversal[host]:
                 d[packet][host][k] = 0
 
-pprint.pprint(d)
+# pprint.pprint(d)
