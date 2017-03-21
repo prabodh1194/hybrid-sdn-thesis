@@ -61,7 +61,7 @@ def close(switch, switches):
 
 def generateFlows(topo,switches,fanout,numHosts):
     flows = {}
-    f = open("flows","w")
+    routes = {}
     stdout = sys.stdout
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
@@ -73,7 +73,9 @@ def generateFlows(topo,switches,fanout,numHosts):
     printCount = 0
     printTotal = numHosts*(numHosts-1.0)
 
-    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {3} dl_src=00:00:00:00:00:{0},dl_dst=10:00:00:00:00:{1},actions=set_field:00:00:00:00:00:{1}"->"eth_dst,set_field:10:00:00:00:00:{0}"->"eth_src,{2}'
+    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_src={1},dl_dst={2},actions=set_field:{3}"->"eth_dst,set_field:{4}"->"eth_src,{5}'
+    mm = '00:00:00:00:00:'
+    fm = '10:00:00:00:00:'
     for i in range(0,numHosts):
         print
         for j in range(i,numHosts):
@@ -83,8 +85,9 @@ def generateFlows(topo,switches,fanout,numHosts):
 
             h_src = 'h'+str(i+1)
             h_dst = 'h'+str(j+1)
+            eth_dst = ''
             #print '>&2 echo \'',h_src,h_dst,'\''
-            s = topo[topo[h_dst][0]] # distro layer switch
+            s = topo[topo[h_dst][0]] # distro layer switch for the dst
 
             #find a candidate OF switch to install a flow
             if topo[topo[h_src][0]][0] in switches: # src host is connected to an OF switch
@@ -107,6 +110,7 @@ def generateFlows(topo,switches,fanout,numHosts):
                 if topo[h_src][0] == topo[h_dst][0] or s[0] != switch:
                     # same access switch or under a distro switch which is not OF
                     port = 'IN_PORT'
+                    routes[net.get(h_src).IP()[5]] = topo[switch][1]
                 else:
                     port = 'output:'+s[1]
             # or under different distro switch
@@ -121,11 +125,20 @@ def generateFlows(topo,switches,fanout,numHosts):
                     # dst and src lie on separate non-of switch
                     port = 'IN_PORT'
 
-            print '#'+switch
-            flowadd = flow.format(hex(i+1)[2:].zfill(2), hex(j+1)[2:].zfill(2),port,switch)
+            if switch == s[0]:
+                eth_dst = mm+hex(j+1)[2:].zfill(2)
+            else:
+                parent_intf = int(topo[switch][1])
+                eth_dst = net.get('s1').intfs[parent_intf-1].MAC()
+                net.get('s1').cmd('arp -i {0} -s {1} {2}'.format('s1-eth'+str(parent_intf), net.get(h_dst).IP(), fm+hex(j+1)[2:].zfill(2)))
+
+            print '#'+switch,h_src,'->',h_dst
+            # 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_src={1},dl_dst={2},actions=set_field:{3}"->"eth_dst,set_field:{4}"->"eth_src,{5}'
+            flowadd = flow.format(switch,net.get(h_src).IP(),fm+hex(j+1)[2:].zfill(2),eth_dst,fm+hex(i+1)[2:].zfill(2),port)
             print flowadd
 
             h_src, h_dst = h_dst, h_src
+            eth_dst = ''
             # print '>&2 echo \'',h_src,h_dst,'\''
             s = topo[topo[h_dst][0]] # distro layer switch
 
@@ -153,8 +166,15 @@ def generateFlows(topo,switches,fanout,numHosts):
                     # dst and src lie on separate non-of switch
                     port = 'IN_PORT'
 
-            print '#'+switch
-            flowadd = flow.format(hex(j+1)[2:].zfill(2), hex(i+1)[2:].zfill(2),port,switch)
+            if switch == s[0]:
+                eth_dst = mm+hex(i+1)[2:].zfill(2)
+            else:
+                parent_intf = int(topo[switch][1])
+                eth_dst = net.get('s1').intfs[parent_intf-1].MAC()
+                net.get('s1').cmd('arp -i {0} -s {1} {2}'.format('s1-eth'+str(parent_intf), net.get(h_dst).IP(), fm+hex(i+1)[2:].zfill(2)))
+
+            print '#'+switch,h_src,'->',h_dst
+            flowadd = flow.format(switch,net.get(h_src).IP(),fm+hex(i+1)[2:].zfill(2),eth_dst,fm+hex(j+1)[2:].zfill(2),port)
             print flowadd
 
             printCount += 2
@@ -163,6 +183,26 @@ def generateFlows(topo,switches,fanout,numHosts):
     print '>&2 echo'
     sys.stdout = stdout
 
+    f = open("pbr.sh","w")
+    f.write("""
+ip rule del table local
+ip rule add pref 32765 table local
+ip rule add to 10.0.1.1 pref 0 table local
+ip rule add to 10.0.2.1 pref 0 table local
+ip rule add to 10.0.3.1 pref 0 table local
+ip rule add to 10.0.4.1 pref 0 table local
+ip rule add to 10.0.1.0/24 dev s1-eth1 pref 1 table 2
+ip rule add to 10.0.2.0/24 dev s1-eth2 pref 1 table 3
+ip rule add to 10.0.3.0/24 dev s1-eth3 pref 1 table 4
+ip rule add to 10.0.4.0/24 dev s1-eth4 pref 1 table 5
+""")
+    for r in routes:
+        f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s1-eth{2}\n'.format(r,int(r)+1,routes[r]))
+    f.close()
+
+    os.system('cat pbr.sh')
+
+    f = open("flows","w")
     json.dump(flows, f)
 
 def printTopoDS(net,switches):
@@ -246,18 +286,28 @@ def treeNet(net, depth, fanout, switches):
     info( '*** Starting network\n')
     net.build()
 
+    topo = printTopoDS(net, switches)
+
     for host in net.hosts:
 
         if 'mirror' in str(host) or 's1' in str(host):
             continue
         mac = '00:00:00:00:00:'+hex(int(str(host)[1:]))[2:].zfill(2)
         host.setMAC(mac)
+        switch = topo[topo[str(host)][0]][0] # distro switch
         for host2 in net.hosts:
             if 'mirror' in str(host2) or 's1' in str(host2):
                 continue
             if str(host) == str(host2):
                 continue
-            mac = '10:00:00:00:00:'+hex(int(str(host2)[1:]))[2:].zfill(2)
+            if host.IP()[5] != host2.IP()[5]:
+                continue
+            if switch in switches:
+                mac = '10:00:00:00:00:'+hex(int(str(host2)[1:]))[2:].zfill(2)
+            else:
+                parent_intf = int(topo[switch][1])
+                mac = net.get('s1').intfs[parent_intf-1].MAC()
+
             if len(switches) != 0:
                 host.setARP(host2.IP(), mac)
 
@@ -287,7 +337,6 @@ def treeNet(net, depth, fanout, switches):
             i = int(str(host)[1:])
             host.cmd('route add default gw 10.0.{0}.1 h{1}-eth0'.format(int(ceil((i+0.)/division)),i))
 
-    topo = printTopoDS(net, switches)
     generateFlows(topo,switches,fanout,numHosts)
 
     return numHosts
@@ -367,6 +416,7 @@ if __name__ == '__main__':
 
     print "Testing",','.join(args.switches)
     # net.pingAll()
+    net.get('s1').cmd('sh pbr.sh')
     setLogLevel( 'warning' )
     k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
     startIperf(net,k)
