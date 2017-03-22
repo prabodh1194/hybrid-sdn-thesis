@@ -61,7 +61,6 @@ def close(switch, switches):
 
 def generateFlows(topo,switches,fanout,numHosts):
     flows = {}
-    routes = {}
     stdout = sys.stdout
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
@@ -110,7 +109,6 @@ def generateFlows(topo,switches,fanout,numHosts):
                 if topo[h_src][0] == topo[h_dst][0] or s[0] != switch:
                     # same access switch or under a distro switch which is not OF
                     port = 'IN_PORT'
-                    routes[net.get(h_src).IP()[5]] = topo[switch][1]
                 else:
                     port = 'output:'+s[1]
             # or under different distro switch
@@ -196,8 +194,37 @@ ip rule add to 10.0.2.0/24 dev s1-eth2 pref 1 table 3
 ip rule add to 10.0.3.0/24 dev s1-eth3 pref 1 table 4
 ip rule add to 10.0.4.0/24 dev s1-eth4 pref 1 table 5
 """)
-    for r in routes:
-        f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s1-eth{2}\n'.format(r,int(r)+1,routes[r]))
+
+    # policies are written such that, packets meant for one particular intf are
+    # written on that table
+    # e.g., outs for intf s1-eth1 are written to table 2.
+    for i in range(fanout): # table - intf
+        for j in range(fanout): # subnet
+            f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s1-eth{2}\n'.format(j+1,i+2,i+1))
+
+    subnets = {}
+
+    for fl in flows:
+        h_src = fl.split('-')[0]
+        h_dst = fl.split('-')[1]
+        sub_src = net.get(h_src).IP()
+        sub_src = sub_src[:sub_src.rfind('.')]+".0/24"
+        sub_dst = net.get(h_dst).IP()
+        sub_dst = sub_dst[:sub_dst.rfind('.')]+".0/24"
+
+        if sub_src == sub_dst:
+            continue
+
+        sw_src = topo[topo[h_src][0]][0]
+        sw_dst = topo[topo[h_dst][0]][0]
+        k = sub_src+"-"+sub_dst
+        intf = flows[fl][1:]
+
+        if sw_src not in switches and sw_dst not in switches and k not in subnets:
+            f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_dst,sub_src,sub_src.split('.')[2],intf))
+            f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_src,sub_dst,sub_dst.split('.')[2],intf))
+            subnets[k] = 1
+
     f.close()
 
     os.system('cat pbr.sh')
@@ -363,8 +390,8 @@ def startIperf(net,name):
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        # h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
-        h2.cmd('sleep 2 && cd ../../../pcap/10.0.0.{1}_ditg_files/ && sudo ITGSend 10.0.0.{1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),str(h1)[1:]))
+        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        # h2.cmd('sleep 2 && cd ../../../pcap/10.0.0.{1}_ditg_files/ && sudo ITGSend 10.0.0.{1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),str(h1)[1:]))
 
 if __name__ == '__main__':
 
@@ -403,7 +430,11 @@ if __name__ == '__main__':
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/24 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+        router = net.get('s1')
+
+        for i in router.intfs:
+            router.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(router.intfs[i])))
         # for host in net.hosts:
         #     host.cmd('tcpdump src {1} or dst {1} and udp -w ../../../stat/{0} &'.format(str(host),host.IP()))
 
@@ -415,8 +446,13 @@ if __name__ == '__main__':
         exit(0)
 
     print "Testing",','.join(args.switches)
-    # net.pingAll()
+
     net.get('s1').cmd('sh pbr.sh')
+
+    print net.get('s1').cmdPrint('ip rule list')
+
+    # net.pingAll()
+
     setLogLevel( 'warning' )
     k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
     startIperf(net,k)

@@ -115,9 +115,10 @@ link_latency = {}
 
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
-        for i in range(0,len(traversal[str(host)]),2): # for a host, go through all interfaces in order
-            intf = traversal[host][i]
-            eth1 = traversal[host][i+1]
+        nhost = str(int(host)-1)
+        for i in range(0,len(traversal[nhost]),2): # for a host, go through all interfaces in order
+            intf = traversal[nhost][i]
+            eth1 = traversal[nhost][i+1]
             if intf in d[packet][host] and eth1 not in d[packet][host]:
                 # print >> drop_file,intf,packet,host
                 drop['totalDrop'] += 1
@@ -128,11 +129,11 @@ for packet in d: # go through every recorded packet
                 break
             else:
                 if i-1 >= 0:
-                    link = traversal[host][i-1]+":"+intf
+                    link = traversal[nhost][i-1]+":"+intf
 
                     if link not in link_speed:
                         link_speed[link] = []
-                    link_speed[link] += [d[packet][host][intf].pop(0) - d[packet][host][traversal[host][i-1]].pop(0)]
+                    link_speed[link] += [d[packet][host][intf].pop(0) - d[packet][host][traversal[nhost][i-1]].pop(0)]
 
 for link in link_speed:
     latency = sum(link_speed[link])/len(link_speed[link])
@@ -148,7 +149,7 @@ sys.stdout = stdout
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
         for k in d[packet][host]:
-            if k not in traversal[host]:
+            nhost = str(int(host)-1)
+            if k not in traversal[nhost]:
                 d[packet][host][k] = 0
 
-# pprint.pprint(d)
