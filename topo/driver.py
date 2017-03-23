@@ -19,5 +19,5 @@ for s in combo:
     os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do sudo tcpdump -qns 0 -X -r $var > s$var; rm $var; done')
     os.system('pwd')
     os.system('python parser.py 3 4 {0} >> ../../../stat/pack_info'.format(s.replace(' ',',')))
-    os.system('cd ../../../stat/ && ls -1 | grep "log" | while read var; do ITGDec $var | grep -i "from\|to\|drop"; sudo rm -vf $var; echo; done >> drop')
+    os.system('cd ../../../stat/ && ls -1 | grep "log" | while read var; do ITGDec $var; sudo rm -vf $var; echo; done >> drop')
     os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do sudo rm $var; done')

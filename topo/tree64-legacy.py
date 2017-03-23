@@ -189,10 +189,6 @@ ip rule add to 10.0.1.1 pref 0 table local
 ip rule add to 10.0.2.1 pref 0 table local
 ip rule add to 10.0.3.1 pref 0 table local
 ip rule add to 10.0.4.1 pref 0 table local
-ip rule add to 10.0.1.0/24 dev s1-eth1 pref 1 table 2
-ip rule add to 10.0.2.0/24 dev s1-eth2 pref 1 table 3
-ip rule add to 10.0.3.0/24 dev s1-eth3 pref 1 table 4
-ip rule add to 10.0.4.0/24 dev s1-eth4 pref 1 table 5
 """)
 
     # policies are written such that, packets meant for one particular intf are
@@ -211,10 +207,6 @@ ip rule add to 10.0.4.0/24 dev s1-eth4 pref 1 table 5
         sub_src = sub_src[:sub_src.rfind('.')]+".0/24"
         sub_dst = net.get(h_dst).IP()
         sub_dst = sub_dst[:sub_dst.rfind('.')]+".0/24"
-
-        if sub_src == sub_dst:
-            continue
-
         sw_src = topo[topo[h_src][0]][0]
         sw_dst = topo[topo[h_dst][0]][0]
         k = sub_src+"-"+sub_dst
@@ -222,7 +214,9 @@ ip rule add to 10.0.4.0/24 dev s1-eth4 pref 1 table 5
 
         if sw_src not in switches and sw_dst not in switches and k not in subnets:
             f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_dst,sub_src,sub_src.split('.')[2],intf))
-            f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_src,sub_dst,sub_dst.split('.')[2],intf))
+
+            if sub_src != sub_dst:
+                f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_src,sub_dst,sub_dst.split('.')[2],intf))
             subnets[k] = 1
 
     f.close()
