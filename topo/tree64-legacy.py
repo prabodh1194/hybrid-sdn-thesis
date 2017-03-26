@@ -61,6 +61,7 @@ def close(switch, switches):
 
 def generateFlows(topo,switches,fanout,numHosts):
     flows = {}
+    f = open("flows","w")
     stdout = sys.stdout
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
@@ -181,6 +182,9 @@ def generateFlows(topo,switches,fanout,numHosts):
     print '>&2 echo'
     sys.stdout = stdout
 
+    json.dump(flows, f)
+    f.close()
+
     f = open("pbr.sh","w")
     f.write("""
 ip rule del table local
@@ -222,9 +226,7 @@ ip rule add to 10.0.4.1 pref 0 table local
     f.close()
 
     os.system('cat pbr.sh')
-
-    f = open("flows","w")
-    json.dump(flows, f)
+    net.get('s1').cmd('sh pbr.sh')
 
 def printTopoDS(net,switches):
     topo = {}
@@ -384,8 +386,8 @@ def startIperf(net,name):
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too
-        h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
-        # h2.cmd('sleep 2 && cd ../../../pcap/10.0.0.{1}_ditg_files/ && sudo ITGSend 10.0.0.{1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),str(h1)[1:]))
+        # h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+        h2.cmd('sleep 2 && cd ../../../pcap1/{1}_ditg_files/ && sudo ITGSend {1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),h1.IP()))
 
 if __name__ == '__main__':
 
@@ -440,8 +442,6 @@ if __name__ == '__main__':
         exit(0)
 
     print "Testing",','.join(args.switches)
-
-    net.get('s1').cmd('sh pbr.sh')
 
     print net.get('s1').cmdPrint('ip rule list')
 

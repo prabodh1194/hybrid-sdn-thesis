@@ -55,7 +55,6 @@ for tcp_file in files:
                 else:
                     d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [seconds]
 
-# pprint.pprint(d)
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
 
@@ -153,3 +152,4 @@ for packet in d: # go through every recorded packet
             if k not in traversal[nhost]:
                 d[packet][host][k] = 0
 
+pprint.pprint(d)
