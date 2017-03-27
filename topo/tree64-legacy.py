@@ -269,8 +269,8 @@ def treeNet(net, depth, fanout, switches):
     router = net.addHost( 's1', cls=LinuxRouter, ip='10.0.1.1/24')
 
     switchCount = 2
-    hs100 = {'bw':100,'delay':'10'} #Mbit/s
-    hs1000 = {'bw':1000,'delay':'10'} #Mbit/s
+    hs100 = {'bw':100,'delay':'10ms'} #Mbit/s
+    hs1000 = {'bw':1000,'delay':'10ms'} #Mbit/s
     mirrors = []
     for i in range (1, depth):
         level = pow(fanout, i)
@@ -286,15 +286,17 @@ def treeNet(net, depth, fanout, switches):
             #     net.addLink(s, h, cls=TCLink, **hs100)
 
             if i == 1:
-                net.addLink(s, net.get('s1'),
-                        intfName2='s1-eth{0}'.format(switchCount-1),
-                        params2={'ip':'10.0.{0}.1/24'.format(switchCount-1)})
+                link=net.addLink(s, net.get('s1'),cls=TCLink, **hs1000)
+                link.intf2.setIP('10.0.{0}.1/24'.format(switchCount-1))
 
             if i > 1:
                 prevSwitch = switchCount - j - level/fanout + j/fanout
                 l = net.addLink(s, net.get('s'+str(prevSwitch)), cls=TCLink, **hs100)
 
             switchCount += 1
+
+    for i in range(fanout-1,-1,-1):
+        router.intfs[i].rename('s1-eth{0}'.format(i+1))
 
     info( '*** Add hosts\n')
     numHosts = pow(fanout, depth)

@@ -152,4 +152,4 @@ for packet in d: # go through every recorded packet
             if k not in traversal[nhost]:
                 d[packet][host][k] = 0
 
-pprint.pprint(d)
+# pprint.pprint(d)
