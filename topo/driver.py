@@ -15,6 +15,7 @@ os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do su
 
 for s in combo:
     print s
+    os.system('sudo mn -c')
     os.system('python tree64-legacy.py -t -d 3 -f 4 -s {0}'.format(s))
     os.system('cd ../../../stat/ && ls -1 | grep "s[0-9]\+-" | while read var; do sudo tcpdump -qns 0 -X -r $var > s$var; rm $var; done')
     os.system('pwd')

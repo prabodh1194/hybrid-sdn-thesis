@@ -384,7 +384,6 @@ def startIperf(net,name):
     for i in range(num_hosts/2):
         h1 = hosts[i]
         h2 = hosts[i+num_hosts/2]
-        # h1.cmd('/usr/local/bin/iperf3 -1 -s -f M > ../../../stat/servout'+name+str(h1)+' &')
         h1.cmd('ITGRecv &')
 
         # Can not record client side data too

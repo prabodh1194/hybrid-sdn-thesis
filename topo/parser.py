@@ -1,13 +1,17 @@
-import sys, os, re, pprint, json
+import sys, os, re, pprint, json, pdb
 from math import ceil
 
-pattern = "([0-9:.]+) IP ([0-9:.]+) > ([0-9:.]+):"
+def min(a,b):
+    return a if a<b else b
+
+pattern = "([0-9:.]+) IP ([0-9:.]+) > ([0-9:.]+):.*length ([0-9:.]+)"
 
 flag = -1
 
 src = ''
 dst = ''
-seconds = ''
+seconds = 0
+min_seconds = 86400000
 packet = ''
 header = sys.argv[3]
 
@@ -32,9 +36,11 @@ for tcp_file in files:
 
             src = m.group(2).split('.')[3]
             dst = m.group(3)
+            size = int(m.group(4))
 
             #milli
             seconds = t[0]*60*60*1000 + t[1]*60*1000 + t[2]*1000 + t[3]/1000.0
+            min_seconds = min(min_seconds,seconds)
             # print m.group(1),seconds,src,dst
             continue
 
@@ -48,13 +54,22 @@ for tcp_file in files:
             # print line[14:18]
 
             if packet not in d:
-                d[packet] = {src:{tcp_file:[seconds]}}
+                d[packet] = {src:{tcp_file:[(seconds,size)]}}
             else:
                 if src not in d[packet]:
-                     d[packet][src] = {tcp_file:[seconds]}
+                     d[packet][src] = {tcp_file:[(seconds,size)]}
                 else:
-                    d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [seconds]
+                    d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [(seconds,size)]
 
+for packet in d: # go through every recorded packet
+    for host in d[packet]: # for every packet, go through every host
+        for intf in d[packet][host]:
+            z = []
+            for i in d[packet][host][intf]:
+                z += [(i[0]-min_seconds,i[1])]
+            d[packet][host][intf] = z
+
+# pprint.pprint(d)
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
 
@@ -103,14 +118,16 @@ for i in range(1+hosts/2,hosts+1):
             traversal[str (i)].insert(idx,'{0}-eth1'.format(str(topo[k][0])))
         k = topo[k][0]
 
-print >> sys.stderr, traversal
+print >> sys.stderr, pprint.pformat(traversal)
 
 drop_file = open('../../../stat/drop','a')
 
 totalDrop = 0
 drop = {'totalDrop':0}
 link_speed = {}
-link_latency = {}
+link_util  = {}
+link_bw = {}
+latency = {}
 
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
@@ -127,22 +144,60 @@ for packet in d: # go through every recorded packet
                     drop[eth1.split('-')[0]] += 1
                 break
             else:
+                sw = intf[1:intf.find('-')]
+
+                if sw not in latency:
+                    latency[sw] = {'latency':0,'packets':0}
+
+                latency[sw]['packets'] += 1
+                if eth1 == intf:
+                    try:
+                        latency[sw]['latency'] += (d[packet][host][eth1][1][0] - d[packet][host][intf][0][0])
+                    except:
+                        latency[sw]['packets'] -= 1
+                else:
+                    latency[sw]['latency'] += (d[packet][host][eth1][0][0] - d[packet][host][intf][0][0])
+
                 if i-1 >= 0:
+                    p1 = d[packet][host][intf].pop(0)
+                    p2 = d[packet][host][traversal[nhost][i-1]].pop(0)
                     link = traversal[nhost][i-1]+":"+intf
 
                     if link not in link_speed:
-                        link_speed[link] = []
-                    link_speed[link] += [d[packet][host][intf].pop(0) - d[packet][host][traversal[nhost][i-1]].pop(0)]
+                        link_speed[link] = {}
+                    second = str(int(ceil(p2[0]/1000)))
+
+                    if second not in link_speed[link]:
+                        link_speed[link][second] = []
+                    link_speed[link][second] += [(p1[0] - p2[0],p1[1])]
+
+for sw in latency:
+    latency[sw] = latency[sw]['latency']/latency[sw]['packets']
 
 for link in link_speed:
-    latency = sum(link_speed[link])/len(link_speed[link])
-    link_latency[link] = (latency,(2./1024)/latency,len(link_speed[link]))
+    link_util[link] = 0
+    link_bw[link] = {}
+    bw = 0
+    for second in link_speed[link]:
+        link_util[link] += (len(link_speed[link][second]))
+        link_bw[link][second] = 0
+        for t in link_speed[link][second]:
+            link_bw[link][second] += t[1]
+        link_bw[link][second] /= (1024*1024.)
+        bw += link_bw[link][second]
+    link_bw[link] = bw/len(link_speed[link])
+
+for link in link_speed:
+    link_speed[link] = (link_util[link],link_bw[link])
 
 stdout = sys.stdout
 sys.stdout = drop_file
 print header
 pprint.pprint(drop)
-pprint.pprint(link_latency)
+# pprint.pprint(link_util)
+# pprint.pprint(link_bw)
+pprint.pprint(link_speed)
+pprint.pprint(latency)
 sys.stdout = stdout
 
 for packet in d: # go through every recorded packet
@@ -151,5 +206,3 @@ for packet in d: # go through every recorded packet
             nhost = str(int(host)-1)
             if k not in traversal[nhost]:
                 d[packet][host][k] = 0
-
-# pprint.pprint(d)
