@@ -85,38 +85,55 @@ except:
 
 depth = int(sys.argv[1])
 fanout = int(sys.argv[2])
-hosts = pow(fanout, depth)
 
 traversal = {}
+hosts = [[1,2,5,6,9,10,13,15,17,18,21,22,25,26,29,30],
+        [33,34,37,38,41,42,45,46,49,50,53,54,57,58,61,62]]
+flag = 0
+delay = "Average delay += +([0-9.]+) s"
+bitrate = "Average bitrate += +([0-9.]+) Kbit"
+host_ee = {}
 
-for i in range(1+hosts/2,hosts+1):
-    if i not in traversal:
-        traversal[str(i)] = []
+for i in range(len(hosts[0])):
+    flag ^= 1
+    cli = hosts[flag^1][i]
+    serv = hosts[flag][i]
 
-    k = 'h'+str(i)
+    #construct traversal
+    if cli not in traversal:
+        traversal[str(cli)] = []
+
+    k = 'h'+str(cli)
     while True:
         if k not in topo:
             break
-        traversal[str(i)] += ['{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1]))]
+        traversal[str(cli)] += ['{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1]))]
         if topo[k][0] != 's1':
-            traversal[str(i)] += ['{0}-eth1'.format(str(topo[k][0]))]
+            traversal[str(cli)] += ['{0}-eth1'.format(str(topo[k][0]))]
         k = topo[k][0]
 
-    k = 'h'+str(i-hosts/2)+"-"+'h'+str(i)
+    k = 'h'+str(serv)+"-"+'h'+str(cli)
     if k in flows:
         flow_sw = str(flows[k])
-        traversal[str(i)] += ['s1-eth{0}'.format(str(topo[flow_sw][1])),'{0}-eth1'.format(flow_sw),'{0}-eth1'.format(flow_sw),'s1-eth{0}'.format(str(topo[flow_sw][1]))]
+        traversal[str(cli)] += ['s1-eth{0}'.format(str(topo[flow_sw][1])),'{0}-eth1'.format(flow_sw),'{0}-eth1'.format(flow_sw),'s1-eth{0}'.format(str(topo[flow_sw][1]))]
 
-    k = 'h'+str(i-hosts/2)
-    idx = len(traversal[str(i)])
+    k = 'h'+str(serv)
+    idx = len(traversal[str(cli)])
 
     while True:
         if k not in topo:
             break
-        traversal[str (i)].insert(idx,'{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1])))
+        traversal[str (cli)].insert(idx,'{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1])))
         if topo[k][0] != 's1':
-            traversal[str (i)].insert(idx,'{0}-eth1'.format(str(topo[k][0])))
+            traversal[str (cli)].insert(idx,'{0}-eth1'.format(str(topo[k][0])))
         k = topo[k][0]
+
+    #construct end-to-end latency
+    k = 'h'+str(serv)
+    ITG = os.popen('ITGDec $HOME/prabodh/stat/recv{0}.log|tail -15|grep -i average'.format(k)).read()
+    delay_s = float(re.search(delay, ITG).group(1))*1000
+    bitrate_mBps = float(re.search(bitrate, ITG).group(1))/(8*1024)
+    host_ee[k] = {'delay':delay_s,'bitrate':bitrate_mBps}
 
 print >> sys.stderr, pprint.pformat(traversal)
 
@@ -198,6 +215,7 @@ pprint.pprint(drop)
 # pprint.pprint(link_bw)
 pprint.pprint(link_speed)
 pprint.pprint(latency)
+pprint.pprint(host_ee)
 sys.stdout = stdout
 
 for packet in d: # go through every recorded packet

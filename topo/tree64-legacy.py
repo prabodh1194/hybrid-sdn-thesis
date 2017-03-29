@@ -366,29 +366,43 @@ def treeNet(net, depth, fanout, switches):
 
     return numHosts
 
-def startIperf(net,name):
-    hosts = []
-    mirrors = []
+def startTG(net,name):
+    'Traffic generation'
 
-    for h in net.hosts:
-        if 's1' in str(h):
-            continue
-        if 'mirror' in str(h):
-            mirrors += [h]
-        else:
-            hosts += [h]
+    # hosts = []
+    # mirrors = []
 
-    num_hosts = len(hosts)
-    res = {}
+    # for h in net.hosts:
+    #     if 's1' in str(h):
+    #         continue
+    #     if 'mirror' in str(h):
+    #         mirrors += [h]
+    #     else:
+    #         hosts += [h]
 
-    for i in range(num_hosts/2):
-        h1 = hosts[i]
-        h2 = hosts[i+num_hosts/2]
-        h1.cmd('ITGRecv &')
+    # num_hosts = len(hosts)
+    # res = {}
 
-        # Can not record client side data too
-        # h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
-        h2.cmd('sleep 2 && cd ../../../pcap1/{1}_ditg_files/ && sudo ITGSend {1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),h1.IP()))
+    # for i in range(num_hosts/2):
+    #     h1 = hosts[i]
+    #     h2 = hosts[i+num_hosts/2]
+    #     h1.cmd('ITGRecv &')
+
+    #     # Can not record client side data too
+    #     h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -O 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
+    #     # h2.cmd('sleep 2 && cd ../../../pcap1/{1}_ditg_files/ && sudo ITGSend {1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),h1.IP()))
+    hosts = [[1,2,5,6,9,10,13,15,17,18,21,22,25,26,29,30],
+            [33,34,37,38,41,42,45,46,49,50,53,54,57,58,61,62]]
+    flag = 0
+
+    for i in range(len(hosts[0])):
+        flag ^= 1
+
+        serv = net.get('h'+str(hosts[flag][i]))
+        cli  = net.get('h'+str(hosts[flag^1][i]))
+
+        serv.cmd('ITGRecv &')
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -O 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
 
@@ -450,7 +464,7 @@ if __name__ == '__main__':
 
     setLogLevel( 'warning' )
     k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
-    startIperf(net,k)
+    startTG(net,k)
 
     # poll for iperfs to die
     time.sleep(10)
