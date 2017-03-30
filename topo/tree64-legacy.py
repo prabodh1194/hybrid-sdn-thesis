@@ -9,12 +9,13 @@ from mininet.net import Mininet
 from mininet.cli import CLI
 from mininet.node import Controller, RemoteController, OVSController
 from mininet.node import OVSKernelSwitch, OVSSwitch, Host, Node
-from mininet.topolib import TreeNet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
 from math import ceil
 import os,sys,argparse,re,time,pprint,json
+
+range1 = lambda start, end: range(start, end+1)
 
 class LinuxRouter( Node ):
     "A Node with IP forwarding enabled."
@@ -237,7 +238,7 @@ def printTopoDS(net,switches):
             continue
         i1 = str(l.intf1.node)
         i2 = str(l.intf2.node)
-        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(1))
+        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(1),l.intf1.IP())
 
     stdout = sys.stdout
     sys.stdout = open(TOPO_FILE, 'w+')
@@ -258,6 +259,20 @@ def treeNet(net, depth, fanout, switches):
         A list of switches which should be SDN enabled. Default is standalone
     '''
 
+    topo_core = {1:[2,5]}
+    topo_distro = {2:[6,9],3:[10,13],4:[14,17],5:[18,21]}
+    topo_access = {6: [1, 2], 7: [3, 4], 8: [5, 6], 9: [7, 8], 10: [9, 10], 11:
+            [11, 12], 12: [13, 14], 13: [15, 16], 14: [17, 18], 15: [19, 20],
+            16: [21, 22], 17: [23, 24], 18: [25, 26], 19: [27, 28], 20: [29,
+                30], 21: [31, 32]}
+    topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32]}
+
+    subs = {}
+
+    for sub in topo_subnet:
+        for host in range1(*topo_subnet[sub]):
+            subs[host] = sub
+
     info( '*** Adding controller\n' )
     c0=net.addController(name='c0',
             controller=RemoteController,
@@ -266,50 +281,44 @@ def treeNet(net, depth, fanout, switches):
 
     info( '*** Add switches\n')
 
-    router = net.addHost( 's1', cls=LinuxRouter, ip='10.0.1.1/24')
-
-    switchCount = 2
     hs100 = {'bw':100,'delay':'10ms'} #Mbit/s
     hs1000 = {'bw':1000,'delay':'10ms'} #Mbit/s
-    mirrors = []
-    for i in range (1, depth):
-        level = pow(fanout, i)
-        for j in range(level):
-            switchName = 's'+str(switchCount)
-            s = net.addSwitch(switchName,
-                    cls=OVSKernelSwitch,
-                    failMode='secure' if switchName in switches else 'standalone')
 
-            # add a mirror port for logging purpose
-            # if mirror:
-            #     h = net.addHost('hmirror'+str(switchCount), cls=Host, ip='10.0.0.'+str(255-switchCount), defaultRoute=None)
-            #     net.addLink(s, h, cls=TCLink, **hs100)
+    for sw in topo_core:
+        router = net.addHost ('s'+str(sw), cls=LinuxRouter, ip='10.0.{0}.1'.format(topo_core[sw][0]-1))
+        for i in range1(*topo_core[sw]):
+            switchName = 's'+str(i)
+            s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='secure' if switchName in switches else 'standalone')
+            link = net.addLink(s, router, cls=TCLink, **hs1000)
+            link.intf2.setIP('10.0.{0}.1/24'.format(i-1))
 
-            if i == 1:
-                link=net.addLink(s, net.get('s1'),cls=TCLink, **hs1000)
-                link.intf2.setIP('10.0.{0}.1/24'.format(switchCount-1))
+        intf = topo_core[sw][1]-topo_core[sw][0]+1
+        for i in range(intf,0,-1):
+            router.intfs[i-1].rename('s{0}-eth{1}'.format(sw,i))
 
-            if i > 1:
-                prevSwitch = switchCount - j - level/fanout + j/fanout
-                l = net.addLink(s, net.get('s'+str(prevSwitch)), cls=TCLink, **hs100)
-
-            switchCount += 1
-
-    for i in range(fanout-1,-1,-1):
-        router.intfs[i].rename('s1-eth{0}'.format(i+1))
+    for sw in topo_distro:
+        for i in range1(*topo_distro[sw]):
+            switchName = 's'+str(i)
+            s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='standalone')
+            link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Add hosts\n')
-    numHosts = pow(fanout, depth)
-    switchOff = 1+(pow(fanout, depth-1)-1)/(fanout-1)
-    division = numHosts/fanout #number of hosts under a distro switch
-    for i in range(numHosts):
-        h = net.addHost('h'+str(i+1),
-                ip='10.0.{0}.{1}/24'.format(int(ceil((i+1.)/division)),str(i+2)),
-                defaultRoute=None)
-        net.addLink(h, net.get('s'+str(switchOff+i/fanout)), cls=TCLink, **hs100)
+    for sw in topo_access:
+        for i in range1(*topo_access[sw]):
+            hostName = 'h'+str(i)
+            h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(subs[i]))
+            link = net.addLink(h, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Starting network\n')
     net.build()
+
+    for sub in topo_subnet:
+        count = 2
+        for i in range1(*topo_subnet[sub]):
+            hostName = 'h'+str(i)
+            h = net.get(hostName)
+            h.setIP('10.0.{0}.{1}/24'.format(sub, count))
+            count += 1
 
     topo = printTopoDS(net, switches)
 
@@ -354,14 +363,13 @@ def treeNet(net, depth, fanout, switches):
 
     info( '*** Post configure switches and hosts\n')
 
-    # add routes
-    for host in net.hosts:
-        if str(host) == 's1' or 'mirror' in str(host):
-            continue
-        else:
-            i = int(str(host)[1:])
-            host.cmd('route add default gw 10.0.{0}.1 h{1}-eth0'.format(int(ceil((i+0.)/division)),i))
+    for sub in topo_subnet:
+        for i in range1(*topo_subnet[sub]):
+            hostName = 'h'+str(i)
+            h = net.get(hostName)
+            h.cmd('sudo route add default gw 10.0.{0}.1 h{1}-eth0'.format(sub,i))
 
+    numHosts = len(net.hosts)-len(topo_core.keys())
     generateFlows(topo,switches,fanout,numHosts)
 
     return numHosts
@@ -369,30 +377,8 @@ def treeNet(net, depth, fanout, switches):
 def startTG(net,name):
     'Traffic generation'
 
-    # hosts = []
-    # mirrors = []
-
-    # for h in net.hosts:
-    #     if 's1' in str(h):
-    #         continue
-    #     if 'mirror' in str(h):
-    #         mirrors += [h]
-    #     else:
-    #         hosts += [h]
-
-    # num_hosts = len(hosts)
-    # res = {}
-
-    # for i in range(num_hosts/2):
-    #     h1 = hosts[i]
-    #     h2 = hosts[i+num_hosts/2]
-    #     h1.cmd('ITGRecv &')
-
-    #     # Can not record client side data too
-    #     h2.cmd('sleep 2 && ITGSend -T UDP -a '+h1.IP()+' -t 10000 -O 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(h1)))
-    #     # h2.cmd('sleep 2 && cd ../../../pcap1/{1}_ditg_files/ && sudo ITGSend {1}.ditg -l ../../stat/send{0}.log -x ../../../stat/recv{0}.log && cd - &'.format(str(h1),h1.IP()))
-    hosts = [[1,2,5,6,9,10,13,15,17,18,21,22,25,26,29,30],
-            [33,34,37,38,41,42,45,46,49,50,53,54,57,58,61,62]]
+    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            [17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31, 32]]
     flag = 0
 
     for i in range(len(hosts[0])):
@@ -402,7 +388,7 @@ def startTG(net,name):
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
         serv.cmd('ITGRecv &')
-        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -O 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
 
