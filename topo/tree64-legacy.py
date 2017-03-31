@@ -13,9 +13,28 @@ from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
 from math import ceil
-import os,sys,argparse,re,time,pprint,json
+import os,sys,argparse,re,time,pprint,json,pdb
 
 range1 = lambda start, end: range(start, end+1)
+
+def back(topo):
+    topo_back = {}
+    for k in topo:
+        for i in range1(*topo[k]):
+            topo_back[i] = k 
+    return topo_back
+
+topo_core = {1:[2,5]}
+topo_distro = {2:[6,9],3:[10,13],4:[14,17],5:[18,21]}
+topo_access = {6: [1, 2], 7: [3, 4], 8: [5, 6], 9: [7, 8], 10: [9, 10], 11:
+        [11, 12], 12: [13, 14], 13: [15, 16], 14: [17, 18], 15: [19, 20],
+        16: [21, 22], 17: [23, 24], 18: [25, 26], 19: [27, 28], 20: [29, 30], 21: [31, 32]}
+topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32]}
+
+topo_core_back = back(topo_core)
+topo_distro_back = back(topo_distro)
+topo_access_back = back(topo_access)
+topo_subnet_back = back(topo_subnet)
 
 class LinuxRouter( Node ):
     "A Node with IP forwarding enabled."
@@ -60,126 +79,54 @@ def close(switch, switches):
             return s
     return switches[-1]
 
-def generateFlows(topo,switches,fanout,numHosts):
+def generateFlows(net,topo,switches,fanout,numHosts):
+
+    subs = topo_subnet.keys()
+    sdn_switch = [int(s[1:]) for s in switches if int(s[1:]) in range(2,2+fanout)]
+    sdn_switch.sort()
+    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_dst={1},priority={2}{3},actions=set_field:{4}"->"eth_dst,{5}'
+
     flows = {}
     f = open("flows","w")
     stdout = sys.stdout
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
         return
-    # 2 -- output:_ / IN_PORT
-    # 3 -- switch
-    sdn_switch = [int(s[1:]) for s in switches if int(s[1:]) in range(2,2+fanout)]
-    sdn_switch.sort()
-    printCount = 0
-    printTotal = numHosts*(numHosts-1.0)
-
-    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_src={1},dl_dst={2},actions=set_field:{3}"->"eth_dst,set_field:{4}"->"eth_src,{5}'
-    mm = '00:00:00:00:00:'
-    fm = '10:00:00:00:00:'
-    for i in range(0,numHosts):
-        print
-        for j in range(i,numHosts):
+    
+    for i in subs:
+        sw_i = i+1
+        for j in subs:
+            sw_j = j+1
 
             if i == j:
-                continue
-
-            h_src = 'h'+str(i+1)
-            h_dst = 'h'+str(j+1)
-            eth_dst = ''
-            #print '>&2 echo \'',h_src,h_dst,'\''
-            s = topo[topo[h_dst][0]] # distro layer switch for the dst
-
-            #find a candidate OF switch to install a flow
-            if topo[topo[h_src][0]][0] in switches: # src host is connected to an OF switch
-                switch = topo[topo[h_src][0]][0]
-            elif s[0] in switches: # dst host is connected to an OF switch
-                switch = s[0]
-            else: # neither src nor dst are on OF switches; greedily select a switch closest of two options
-                s_no = int(s[0][1:])
-                switch = close(s_no, sdn_switch)
-                # switch = 's'+str(switch[0] if abs(switch[0]-s_no) <= abs(switch[1]-s_no) else switch[1])
-                switch = 's'+str(switch)
-                flows[h_src+"-"+h_dst] = switch
-
-            # determine a port number on which the flow outputs the packet after
-            # processing
-            # there can be a number of cases in which a packet is re-directed to an OF port.
-
-            # both src and dst are under same distro switch
-            if s[0] == topo[topo[h_src][0]][0]:
-                if topo[h_src][0] == topo[h_dst][0] or s[0] != switch:
-                    # same access switch or under a distro switch which is not OF
-                    port = 'IN_PORT'
+                if sw_i in sdn_switch:
+                    hosts = topo_subnet[i]
+                    for h in range1(*hosts):
+                        host = 'h'+str(h)
+                        intf = topo[topo[host][0]][1]
+                        print flow.format('s'+str(sw_i),topo[host][2],2,',in_port='+intf,net.get(host).MAC(),'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
+                        print flow.format('s'+str(sw_i),topo[host][2],1,'',net.get(host).MAC(),'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
                 else:
-                    port = 'output:'+s[1]
-            # or under different distro switch
+                    switch = str(close(sw_i, sdn_switch))
+                    flows[str(i)+'-'+str(j)] = switch
+                    router = topo['s'+switch]
+                    hosts = topo_subnet[i]
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),1,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
+                    for h in range1(*hosts):
+                        host = 'h'+str(h)
+                        net.get(router[0]).cmd('arp -i {0} -s {1} {2}'.format(router[0]+'-eth'+router[1], net.get(host).IP(), net.get('s'+switch).intfs[1].MAC()))
             else:
-                if s[0] == switch:
-                    # dst lies under a distro switch which is OF enabled
-                    port = 'output:'+s[1]
-                elif topo[topo[h_src][0]][0] == switch:
-                    # src lies under an OF switch
-                    port = 'output:1'
-                else:
-                    # dst and src lie on separate non-of switch
-                    port = 'IN_PORT'
+                if sw_i not in sdn_switch and sw_j not in sdn_switch:
+                    switch = str(close(sw_i, sdn_switch))
+                    flows[str(i)+'-'+str(j)] = switch
+                    router = topo['s'+switch]
+                    hosts = topo_subnet[i]
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),1,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
+                    for h in range1(*hosts):
+                        host = 'h'+str(h)
+                        net.get(router[0]).cmd('arp -i {0} -s {1} {2}'.format(router[0]+'-eth'+router[1], net.get(host).IP(), net.get('s'+switch).intfs[1].MAC()))
 
-            if switch == s[0]:
-                eth_dst = mm+hex(j+1)[2:].zfill(2)
-            else:
-                parent_intf = int(topo[switch][1])
-                eth_dst = net.get('s1').intfs[parent_intf-1].MAC()
-                net.get('s1').cmd('arp -i {0} -s {1} {2}'.format('s1-eth'+str(parent_intf), net.get(h_dst).IP(), fm+hex(j+1)[2:].zfill(2)))
-
-            print '#'+switch,h_src,'->',h_dst
-            # 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_src={1},dl_dst={2},actions=set_field:{3}"->"eth_dst,set_field:{4}"->"eth_src,{5}'
-            flowadd = flow.format(switch,net.get(h_src).IP(),fm+hex(j+1)[2:].zfill(2),eth_dst,fm+hex(i+1)[2:].zfill(2),port)
-            print flowadd
-
-            h_src, h_dst = h_dst, h_src
-            eth_dst = ''
-            # print '>&2 echo \'',h_src,h_dst,'\''
-            s = topo[topo[h_dst][0]] # distro layer switch
-
-            if topo[topo[h_src][0]][0] in switches: # src host is connected to an OF switch
-                switch = topo[topo[h_src][0]][0]
-
-            # there can be a number of cases in which a packet is re-directed to an OF port.
-
-            # both src and dst are under same distro switch
-            if s[0] == topo[topo[h_src][0]][0]:
-                if topo[h_src][0] == topo[h_dst][0] or s[0] != switch:
-                    # same access switch or under a distro switch which is not OF
-                    port = 'IN_PORT'
-                else:
-                    port = 'output:'+s[1]
-            # or under different distro switch
-            else:
-                if s[0] == switch:
-                    # dst lies under a distro switch which is OF enabled
-                    port = 'output:'+s[1]
-                elif topo[topo[h_src][0]][0] == switch:
-                    # src lies under an OF switch
-                    port = 'output:1'
-                else:
-                    # dst and src lie on separate non-of switch
-                    port = 'IN_PORT'
-
-            if switch == s[0]:
-                eth_dst = mm+hex(i+1)[2:].zfill(2)
-            else:
-                parent_intf = int(topo[switch][1])
-                eth_dst = net.get('s1').intfs[parent_intf-1].MAC()
-                net.get('s1').cmd('arp -i {0} -s {1} {2}'.format('s1-eth'+str(parent_intf), net.get(h_dst).IP(), fm+hex(i+1)[2:].zfill(2)))
-
-            print '#'+switch,h_src,'->',h_dst
-            flowadd = flow.format(switch,net.get(h_src).IP(),fm+hex(i+1)[2:].zfill(2),eth_dst,fm+hex(j+1)[2:].zfill(2),port)
-            print flowadd
-
-            printCount += 2
-            print '>&2 printf "%.2f%%\r" ',(100.0*printCount/printTotal)
-
+    print '>&2 printf "%.2f%%\r" ',(100.0*1/100)
     print '>&2 echo'
     sys.stdout = stdout
 
@@ -206,16 +153,14 @@ ip rule add to 10.0.4.1 pref 0 table local
     subnets = {}
 
     for fl in flows:
-        h_src = fl.split('-')[0]
-        h_dst = fl.split('-')[1]
-        sub_src = net.get(h_src).IP()
-        sub_src = sub_src[:sub_src.rfind('.')]+".0/24"
-        sub_dst = net.get(h_dst).IP()
-        sub_dst = sub_dst[:sub_dst.rfind('.')]+".0/24"
-        sw_src = topo[topo[h_src][0]][0]
-        sw_dst = topo[topo[h_dst][0]][0]
+        sub_src = fl.split('-')[0]
+        sub_dst = fl.split('-')[1]
+        sw_src = int(sub_src)+1
+        sw_dst = int(sub_dst)+1
+        sub_src = '10.0.{0}.0/24'.format(sub_src)
+        sub_dst = '10.0.{0}.0/24'.format(sub_dst)
         k = sub_src+"-"+sub_dst
-        intf = flows[fl][1:]
+        intf = flows[fl]
 
         if sw_src not in switches and sw_dst not in switches and k not in subnets:
             f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_dst,sub_src,sub_src.split('.')[2],intf))
@@ -259,20 +204,6 @@ def treeNet(net, depth, fanout, switches):
         A list of switches which should be SDN enabled. Default is standalone
     '''
 
-    topo_core = {1:[2,5]}
-    topo_distro = {2:[6,9],3:[10,13],4:[14,17],5:[18,21]}
-    topo_access = {6: [1, 2], 7: [3, 4], 8: [5, 6], 9: [7, 8], 10: [9, 10], 11:
-            [11, 12], 12: [13, 14], 13: [15, 16], 14: [17, 18], 15: [19, 20],
-            16: [21, 22], 17: [23, 24], 18: [25, 26], 19: [27, 28], 20: [29,
-                30], 21: [31, 32]}
-    topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32]}
-
-    subs = {}
-
-    for sub in topo_subnet:
-        for host in range1(*topo_subnet[sub]):
-            subs[host] = sub
-
     info( '*** Adding controller\n' )
     c0=net.addController(name='c0',
             controller=RemoteController,
@@ -306,7 +237,7 @@ def treeNet(net, depth, fanout, switches):
     for sw in topo_access:
         for i in range1(*topo_access[sw]):
             hostName = 'h'+str(i)
-            h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(subs[i]))
+            h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(topo_subnet_back[i]))
             link = net.addLink(h, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Starting network\n')
@@ -323,27 +254,10 @@ def treeNet(net, depth, fanout, switches):
     topo = printTopoDS(net, switches)
 
     for host in net.hosts:
-
         if 'mirror' in str(host) or 's1' in str(host):
             continue
         mac = '00:00:00:00:00:'+hex(int(str(host)[1:]))[2:].zfill(2)
         host.setMAC(mac)
-        switch = topo[topo[str(host)][0]][0] # distro switch
-        for host2 in net.hosts:
-            if 'mirror' in str(host2) or 's1' in str(host2):
-                continue
-            if str(host) == str(host2):
-                continue
-            if host.IP()[5] != host2.IP()[5]:
-                continue
-            if switch in switches:
-                mac = '10:00:00:00:00:'+hex(int(str(host2)[1:]))[2:].zfill(2)
-            else:
-                parent_intf = int(topo[switch][1])
-                mac = net.get('s1').intfs[parent_intf-1].MAC()
-
-            if len(switches) != 0:
-                host.setARP(host2.IP(), mac)
 
     info( '*** Starting switches\n')
 
@@ -368,9 +282,10 @@ def treeNet(net, depth, fanout, switches):
             hostName = 'h'+str(i)
             h = net.get(hostName)
             h.cmd('sudo route add default gw 10.0.{0}.1 h{1}-eth0'.format(sub,i))
+            h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
 
     numHosts = len(net.hosts)-len(topo_core.keys())
-    generateFlows(topo,switches,fanout,numHosts)
+    generateFlows(net,topo,switches,fanout,numHosts)
 
     return numHosts
 
