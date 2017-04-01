@@ -17,6 +17,7 @@ from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
+from ryu.controller import dpset
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
@@ -27,13 +28,67 @@ from ryu.lib.packet import icmp
 from ryu.lib.packet import udp
 import array
 
+def pack(byte_sequence):
+    """Convert list of bytes to byte string."""
+    return b"".join(map(chr, byte_sequence))
+
+def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
+    # Formulate a ARP
+    # https://en.wikipedia.org/wiki/EtherType
+
+    print _eth_src, _eth_dst, _ip_src, _ip_dst
+
+    if _ip_src.split('.')[2] == _ip_dst.split('.')[2] or _ip_dst.split('.')[3] != '1':
+        return -1
+
+    print "Doing pout"
+
+    eth_src = [int('0x'+byte, 16) for byte in _eth_src.split(':')]
+    eth_dst = [int('0x'+byte, 16) for byte in _eth_dst.split(':')]
+    eth_type = [0x08, 0x06]
+    arp_type = [0x00, 0x01, 0x08, 0x00, 0x06, 0x04]
+    arp_reply = [0x00, 0x02]
+    arp_req = [0x00, 0x01]
+    ip_src = [int(byte) for byte in _ip_src.split('.')]
+    ip_dst = [int(byte) for byte in _ip_dst.split('.')]
+
+    # arpframe
+        ## ETHERNET
+        # destination MAC addr
+        # source MAC addr
+        # ETHERNET_PROTOCOL_TYPE_ARP,
+        ## ARP
+        # ARP_PROTOCOL_TYPE_ETHERNET_IP,
+        # operation type request/reply
+        # sender MAC addr
+        # sender IP addr
+        # target hardware addr
+        # target IP addr
+
+    arp_frame = eth_dst+eth_src+eth_type+arp_type+arp_reply+eth_src+ip_src+eth_dst+ip_dst
+
+    # Construct Ethernet packet with an IPv4 ICMP PING request as payload
+    r = pack(arp_frame)
+    return r
+
 class SimpleSwitch13(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    _CONTEXTS = {'dpset': dpset.DPSet}
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+        self.dpset = kwargs['dpset']
         self.logger.info("packet in dpid src dst in_port")
+
+    def send_packet_out(self, datapath, buffer_id, in_port, data):
+        ofp = datapath.ofproto
+        ofp_parser = datapath.ofproto_parser
+
+        actions = [ofp_parser.OFPActionOutput(ofp.OFPP_IN_PORT)]
+        req = ofp_parser.OFPPacketOut(datapath, buffer_id,
+                                      in_port, actions, data)
+        datapath.send_msg(req)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -92,7 +147,6 @@ class SimpleSwitch13(app_manager.RyuApp):
         in_port = msg.match['in_port']
 
         pkt = packet.Packet(msg.data)
-        pkt2 = packet.Packet(pkt.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
         pkt_arp = pkt.get_protocol(arp.arp)
@@ -111,13 +165,20 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         pkt_type = ""
         if pkt_arp:
-           pkt_type = "arp"
+            pkt_type = "arp"
+            data = -1
+            if in_port == 1:
+                data = _arp_reply(datapath.ports[1].hw_addr, src, pkt_arp.dst_ip, pkt_arp.src_ip)
+            if data != -1:
+                self.send_packet_out(datapath,msg.buffer_id,in_port,data)
+                self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
+                return
         if pkt_icmp:
-           pkt_type = "icmp"
+            pkt_type = "icmp"
         if pkt_tcp:
-           pkt_type = "tcp"
+            pkt_type = "tcp"
         if pkt_udp:
-           pkt_type = "udp"
+            pkt_type = "udp"
 
         if ("33" not in [dst[:2], src[:2]]) and ("ff" not in [dst[:2], src[:2]]): #supress random flood packets
             self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
@@ -138,10 +199,10 @@ class SimpleSwitch13(app_manager.RyuApp):
             # verify if we have a valid buffer_id, if yes avoid to send both
             # flow_mod & packet_out
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
-                self.add_flow(datapath, 0, match, actions, msg.buffer_id)
+                self.add_flow(datapath, 1, match, actions, msg.buffer_id)
                 return
             else:
-                self.add_flow(datapath, 0, match, actions)
+                self.add_flow(datapath, 1, match, actions)
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data

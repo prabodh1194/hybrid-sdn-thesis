@@ -21,7 +21,7 @@ def back(topo):
     topo_back = {}
     for k in topo:
         for i in range1(*topo[k]):
-            topo_back[i] = k 
+            topo_back[i] = k
     return topo_back
 
 topo_core = {1:[2,5]}
@@ -48,41 +48,16 @@ class LinuxRouter( Node ):
         self.cmd( 'sysctl net.ipv4.ip_forward=0' )
         super( LinuxRouter, self ).terminate()
 
-
-def setMirrors(switchCount, fanout):
-    cmd = ''
-    ovs = "sudo ovs-vsctl -- set Bridge s{0} mirrors=@m"
-    mirr = " -- --id=@eth{2} get Port s{1}-eth{0}"
-    setm = " -- --id=@m create Mirror name=mymirror{0} select-dst-port={1} select-src-port={1} output-port=@eth{2}"
-    ports = ''
-    mirrors = switchCount
-
-    for j in range(fanout):
-        ports += '@eth'+str(j+1)+','
-    ports = ports[:-1]
-
-    for i in range(mirrors):
-        cmd = ''
-        cmd += ovs.format(i+1)
-        for j in range(fanout+1):
-            if i != 0:
-                cmd += mirr.format(j+2,i+1,j+1)
-            else:
-                cmd += mirr.format(j+1,i+1,j+1)
-        cmd += setm.format(i+1,ports,fanout+1)
-        info(cmd)
-        os.system(cmd, )
-
 def close(switch, switches):
     for s in switches:
         if s>=switch:
             return s
     return switches[-1]
 
-def generateFlows(net,topo,switches,fanout,numHosts):
+def generateFlows(net,topo,switches):
 
     subs = topo_subnet.keys()
-    sdn_switch = [int(s[1:]) for s in switches if int(s[1:]) in range(2,2+fanout)]
+    sdn_switch = [int(s[1:]) for s in switches]
     sdn_switch.sort()
     flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_dst={1},priority={2}{3},actions=set_field:{4}"->"eth_dst,{5}'
 
@@ -92,7 +67,7 @@ def generateFlows(net,topo,switches,fanout,numHosts):
     sys.stdout = open(FLOW_FILE, 'w+')
     if len(switches) == 0:
         return
-    
+
     for i in subs:
         sw_i = i+1
         for j in subs:
@@ -104,27 +79,25 @@ def generateFlows(net,topo,switches,fanout,numHosts):
                     for h in range1(*hosts):
                         host = 'h'+str(h)
                         intf = topo[topo[host][0]][1]
-                        print flow.format('s'+str(sw_i),topo[host][2],2,',in_port='+intf,net.get(host).MAC(),'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
-                        print flow.format('s'+str(sw_i),topo[host][2],1,'',net.get(host).MAC(),'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
+                        print flow.format('s'+str(sw_i),topo[host][2],3,',in_port='+intf,net.get(host).MAC(),'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
+                        print flow.format('s'+str(sw_i),topo[host][2],2,'',net.get(host).MAC(),'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
                 else:
                     switch = str(close(sw_i, sdn_switch))
                     flows[str(i)+'-'+str(j)] = switch
                     router = topo['s'+switch]
                     hosts = topo_subnet[i]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),1,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
                     for h in range1(*hosts):
                         host = 'h'+str(h)
-                        net.get(router[0]).cmd('arp -i {0} -s {1} {2}'.format(router[0]+'-eth'+router[1], net.get(host).IP(), net.get('s'+switch).intfs[1].MAC()))
             else:
                 if sw_i not in sdn_switch and sw_j not in sdn_switch:
                     switch = str(close(sw_i, sdn_switch))
                     flows[str(i)+'-'+str(j)] = switch
                     router = topo['s'+switch]
                     hosts = topo_subnet[i]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),1,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
                     for h in range1(*hosts):
                         host = 'h'+str(h)
-                        net.get(router[0]).cmd('arp -i {0} -s {1} {2}'.format(router[0]+'-eth'+router[1], net.get(host).IP(), net.get('s'+switch).intfs[1].MAC()))
 
     print '>&2 printf "%.2f%%\r" ',(100.0*1/100)
     print '>&2 echo'
@@ -146,11 +119,11 @@ ip rule add to 10.0.4.1 pref 0 table local
     # policies are written such that, packets meant for one particular intf are
     # written on that table
     # e.g., outs for intf s1-eth1 are written to table 2.
-    for i in range(fanout): # table - intf
-        for j in range(fanout): # subnet
-            f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s1-eth{2}\n'.format(j+1,i+2,i+1))
-
-    subnets = {}
+    for dist in topo_core:
+        fanout = len(range1(*topo_core[dist]))
+        for i in range(fanout): # table - intf
+            for j in range(fanout): # subnet
+                f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s{2}-eth{3}\n'.format(j+1,i+2,dist,i+1))
 
     for fl in flows:
         sub_src = fl.split('-')[0]
@@ -159,15 +132,10 @@ ip rule add to 10.0.4.1 pref 0 table local
         sw_dst = int(sub_dst)+1
         sub_src = '10.0.{0}.0/24'.format(sub_src)
         sub_dst = '10.0.{0}.0/24'.format(sub_dst)
-        k = sub_src+"-"+sub_dst
         intf = flows[fl]
 
-        if sw_src not in switches and sw_dst not in switches and k not in subnets:
+        if sw_src not in switches and sw_dst not in switches:
             f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_dst,sub_src,sub_src.split('.')[2],intf))
-
-            if sub_src != sub_dst:
-                f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_src,sub_dst,sub_dst.split('.')[2],intf))
-            subnets[k] = 1
 
     f.close()
 
@@ -191,15 +159,10 @@ def printTopoDS(net,switches):
     sys.stdout = stdout
     return topo
 
-def treeNet(net, depth, fanout, switches):
+def treeNet(net, switches):
     '''
     @param net
         The Mininetnet network refernce
-    @param depth
-        Depth of tree. e.g., depth of 3 means the root switch and host have 2
-        more switches in between
-    @param fanout
-        Number of links on each switch
     @param switches
         A list of switches which should be SDN enabled. Default is standalone
     '''
@@ -284,10 +247,7 @@ def treeNet(net, depth, fanout, switches):
             h.cmd('sudo route add default gw 10.0.{0}.1 h{1}-eth0'.format(sub,i))
             h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
 
-    numHosts = len(net.hosts)-len(topo_core.keys())
-    generateFlows(net,topo,switches,fanout,numHosts)
-
-    return numHosts
+    generateFlows(net,topo,switches)
 
 def startTG(net,name):
     'Traffic generation'
@@ -312,9 +272,6 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run a mininet simulation for tree topology')
     parser.add_argument('-c', '--cli', help='Display CLI on given topology.', action='store_true')
-    parser.add_argument('-d', '--depth', help='Depth of mininet tree', nargs=1, default=[3], type=int)
-    parser.add_argument('-f', '--fanout', help='Number of links on each switch', nargs=1, default=[4], type=int)
-    parser.add_argument('-m', '--mirrors', help='Setup mirrors on internal switches for debugging purpose', action='store_true')
     parser.add_argument('-s', '--switches', help='''Names of switches to have
                         SDN. Switches are numbered in level-order of a tree
                         starting from 1. Enter a space seperated list''',
@@ -325,18 +282,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     mirror = args.mirrors
 
-    info('*** building a tree of depth',args.depth[0],'and fanout',args.fanout[0],'\n')
-
-    switchCount = (pow(args.fanout[0],args.depth[0])-1)/(args.fanout[0]-1)
-
     if args.cli:
         setLogLevel( 'info' )
 
     net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
-    hostCount = treeNet(net, args.depth[0], args.fanout[0], set(args.switches))
-
-    if args.mirrors:
-        setMirrors(switchCount, args.fanout[0])
+    treeNet(net, set(args.switches))
 
     print args.stats
     if args.stats:
@@ -364,7 +314,7 @@ if __name__ == '__main__':
     # net.pingAll()
 
     setLogLevel( 'warning' )
-    k = ','.join([str(a) for a in args.depth]+[str(b) for b in args.fanout]+[] if args.switches == {} else args.switches)
+    k = ','.join([] if args.switches == {} else args.switches)
     startTG(net,k)
 
     # poll for iperfs to die

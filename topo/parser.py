@@ -12,7 +12,7 @@ src = ''
 seconds = 0
 min_seconds = 86400000
 packet = ''
-header = sys.argv[3]
+header = sys.argv[1]
 
 d = {}
 files = os.popen('ls -1 ../../../stat | grep "s[0-9]\+-"').read()[:-1]
@@ -81,9 +81,6 @@ try:
 except:
     flows = {}
 
-depth = int(sys.argv[1])
-fanout = int(sys.argv[2])
-
 traversal = {}
 hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
         [17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31, 32]]
@@ -112,9 +109,9 @@ for i in range(len(hosts[0])):
             traversal[cli_k] += ['{0}-eth1'.format(str(topo[k][0]))]
         k = topo[k][0]
 
-    k = 'h'+str(serv)+"-"+'h'+str(cli)
+    k = str(topo['h'+str(cli)][2].split('.')[2])+'-'+str(topo['h'+str(serv)][2].split('.')[2])
     if k in flows:
-        flow_sw = str(flows[k])
+        flow_sw = 's'+flows[k]
         traversal[cli_k] += ['s1-eth{0}'.format(str(topo[flow_sw][1])),'{0}-eth1'.format(flow_sw),'{0}-eth1'.format(flow_sw),'s1-eth{0}'.format(str(topo[flow_sw][1]))]
 
     k = 'h'+str(serv)
