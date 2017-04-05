@@ -225,12 +225,6 @@ def treeNet(net, switches):
     info( '*** Starting switches\n')
 
     for switch in net.switches:
-
-        # add a mirror port for logging purpose
-        if mirror:
-            h = net.addHost('hmirror'+str(switch)[1:], cls=Host, ip='10.0.0.'+str(255-int(str(switch)[1:])), defaultRoute=None)
-            net.addLink(switch, h, cls=TCLink, **hs100)
-
         if str(switch) in switches:
             info('*** switch connected to controller ',switch,'\n')
             switch.start([c0])
@@ -245,7 +239,8 @@ def treeNet(net, switches):
             hostName = 'h'+str(i)
             h = net.get(hostName)
             h.cmd('sudo route add default gw 10.0.{0}.1 h{1}-eth0'.format(sub,i))
-            h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
+            if len(switches) != 0:
+                h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
 
     generateFlows(net,topo,switches)
 
@@ -278,9 +273,7 @@ if __name__ == '__main__':
                         nargs='*', default={}, type=str)
     parser.add_argument('-t', '--stats', help='Start TCPdump on all switch interfaces for stats collection purpose', action='store_true')
 
-    global mirror
     args = parser.parse_args()
-    mirror = args.mirrors
 
     if args.cli:
         setLogLevel( 'info' )

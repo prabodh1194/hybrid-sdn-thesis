@@ -26,7 +26,7 @@ from ryu.lib.packet import arp
 from ryu.lib.packet import tcp
 from ryu.lib.packet import icmp
 from ryu.lib.packet import udp
-import array
+import pdb
 
 def pack(byte_sequence):
     """Convert list of bytes to byte string."""

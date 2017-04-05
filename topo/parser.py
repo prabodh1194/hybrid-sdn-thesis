@@ -198,7 +198,7 @@ for link in link_speed:
             link_bw[link][second] += t[1]
         link_bw[link][second] /= (1024*1024.)
         bw += link_bw[link][second]
-    link_bw[link] = bw/len(link_speed[link])
+    # link_bw[link] = bw/len(link_speed[link])
 
 for link in link_speed:
     link_speed[link] = (link_util[link],link_bw[link])
