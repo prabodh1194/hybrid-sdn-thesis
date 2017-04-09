@@ -259,6 +259,7 @@ def startTG(net,name):
 
         serv.cmd('ITGRecv &')
         cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
+        # cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -z 12648 -Fs ps -Ft idts -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
 

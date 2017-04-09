@@ -87,6 +87,7 @@ hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
 flag = 0
 delay = "Average delay += +([0-9.]+) s"
 bitrate = "Average bitrate += +([0-9.]+) Kbit"
+drop = "Packets dropped += +([0-9]+) "
 host_ee = {}
 
 for i in range(len(hosts[0])):
@@ -127,10 +128,11 @@ for i in range(len(hosts[0])):
 
     #construct end-to-end latency
     k = 'h'+str(serv)
-    ITG = os.popen('ITGDec $HOME/prabodh/stat/recv{0}.log|tail -15|grep -i average'.format(k)).read()
+    ITG = os.popen('ITGDec $HOME/prabodh/stat/recv{0}.log|tail -15|grep -i "average\|drop"'.format(k)).read()
     delay_s = float(re.search(delay, ITG).group(1))*1000
     bitrate_mBps = float(re.search(bitrate, ITG).group(1))/(8*1024)
-    host_ee[k] = {'delay':delay_s,'bitrate':bitrate_mBps}
+    _drop = re.search(drop, ITG).group(1)
+    host_ee[k] = {'delay':delay_s,'bitrate':bitrate_mBps, 'drop': _drop}
 
 print >> sys.stderr, pprint.pformat(traversal)
 
