@@ -244,7 +244,7 @@ def treeNet(net, switches):
 
     generateFlows(net,topo,switches)
 
-def startTG(net,name):
+def startTG(net):
     'Traffic generation'
 
     hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
@@ -309,7 +309,7 @@ if __name__ == '__main__':
 
     setLogLevel( 'warning' )
     k = ','.join([] if args.switches == {} else args.switches)
-    startTG(net,k)
+    startTG(net)
 
     # poll for iperfs to die
     time.sleep(10)
