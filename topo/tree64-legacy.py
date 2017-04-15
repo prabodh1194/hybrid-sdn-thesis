@@ -24,12 +24,16 @@ def back(topo):
             topo_back[i] = k
     return topo_back
 
-topo_core = {1:[2,5]}
-topo_distro = {2:[6,9],3:[10,13],4:[14,17],5:[18,21]}
-topo_access = {6: [1, 2], 7: [3, 4], 8: [5, 6], 9: [7, 8], 10: [9, 10], 11:
-        [11, 12], 12: [13, 14], 13: [15, 16], 14: [17, 18], 15: [19, 20],
-        16: [21, 22], 17: [23, 24], 18: [25, 26], 19: [27, 28], 20: [29, 30], 21: [31, 32]}
-topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32]}
+topo_core = {1:[5,12],2:[5,12],3:[13,20],4:[13,20]}
+topo_distro = {5:[21,24],6:[21,24],7:[25,28],8:[25,28],9:[29,32],10:[29,32],11:[33,36],12:[33,36],13:[37,40],14:[37,40],15:[41,44],16:[41,44],17:[45,48],18:[45,48],19:[49,52],20:[49,52]}
+topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
+        [11, 12], 27: [13, 14], 28: [15, 16], 29: [17, 18], 30: [19, 20], 31:
+        [21, 22], 32: [23, 24], 33: [25, 26], 34: [27, 28], 35: [29, 30], 36:
+        [31, 32], 37: [33, 34], 38: [35, 36], 39: [37, 38], 40: [39, 40], 41:
+        [41, 42], 42: [43, 44], 43: [45, 46], 44: [47, 48], 45: [49, 50], 46:
+        [51, 52], 47: [53, 54], 48: [55, 56], 49: [57, 58], 50: [59, 60], 51:
+        [61, 62], 52: [63, 64]}
+topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32],5:[33,40],6:[41,48],7:[49,56],8:[57,64]}
 
 topo_core_back = back(topo_core)
 topo_distro_back = back(topo_distro)
@@ -178,29 +182,38 @@ def treeNet(net, switches):
     hs100 = {'bw':100,'delay':'10ms'} #Mbit/s
     hs1000 = {'bw':1000,'delay':'10ms'} #Mbit/s
 
+    info( '*** Add core and distribution\n')
     for sw in topo_core:
-        router = net.addHost ('s'+str(sw), cls=LinuxRouter, ip='10.0.{0}.1'.format(topo_core[sw][0]-1))
+        s_core = net.addSwitch('s'+str(sw), cls=OVSKernelSwitch, failMode='standalone')
         for i in range1(*topo_core[sw]):
             switchName = 's'+str(i)
-            s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='secure' if switchName in switches else 'standalone')
-            link = net.addLink(s, router, cls=TCLink, **hs1000)
-            link.intf2.setIP('10.0.{0}.1/24'.format(i-1))
+            s = None
+            try:
+                s = net.get(switchName)
+            except KeyError:
+                s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='secure' if switchName in switches else 'standalone')
+            link = net.addLink(s, s_core, cls=TCLink, **hs1000)
 
-        intf = topo_core[sw][1]-topo_core[sw][0]+1
-        for i in range(intf,0,-1):
-            router.intfs[i-1].rename('s{0}-eth{1}'.format(sw,i))
-
+    info( '*** Add access\n')
     for sw in topo_distro:
         for i in range1(*topo_distro[sw]):
             switchName = 's'+str(i)
-            s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='standalone')
+            s = None
+            try:
+                s = net.get(switchName)
+            except KeyError:
+                s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='standalone')
             link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Add hosts\n')
     for sw in topo_access:
         for i in range1(*topo_access[sw]):
             hostName = 'h'+str(i)
-            h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(topo_subnet_back[i]))
+            h = None
+            try:
+                h = net.get(hostName)
+            except KeyError:
+                h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(topo_subnet_back[i]))
             link = net.addLink(h, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Starting network\n')
@@ -242,7 +255,7 @@ def treeNet(net, switches):
             if len(switches) != 0:
                 h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
 
-    generateFlows(net,topo,switches)
+    # generateFlows(net,topo,switches)
 
 def startTG(net):
     'Traffic generation'
@@ -287,12 +300,6 @@ if __name__ == '__main__':
         for switch in net.switches:
             for i in switch.intfs:
                 switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
-        router = net.get('s1')
-
-        for i in router.intfs:
-            router.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(router.intfs[i])))
-        # for host in net.hosts:
-        #     host.cmd('tcpdump src {1} or dst {1} and udp -w ../../../stat/{0} &'.format(str(host),host.IP()))
 
     os.system('sh flow.sh')
 
@@ -309,7 +316,7 @@ if __name__ == '__main__':
 
     setLogLevel( 'warning' )
     k = ','.join([] if args.switches == {} else args.switches)
-    startTG(net)
+    # startTG(net)
 
     # poll for iperfs to die
     time.sleep(10)

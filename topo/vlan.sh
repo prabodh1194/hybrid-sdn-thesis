@@ -49,4 +49,3 @@ sudo ovs-vsctl add-port s1 vlan10 tag=10 -- set interface vlan10 type=internal
 sudo ovs-vsctl add-port s1 vlan20 tag=20 -- set interface vlan20 type=internal
 sudo ifconfig vlan10 10.0.1.1/24
 sudo ifconfig vlan20 10.0.2.1/24
-
