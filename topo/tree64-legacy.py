@@ -33,12 +33,17 @@ topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
         [41, 42], 42: [43, 44], 43: [45, 46], 44: [47, 48], 45: [49, 50], 46:
         [51, 52], 47: [53, 54], 48: [55, 56], 49: [57, 58], 50: [59, 60], 51:
         [61, 62], 52: [63, 64]}
-topo_subnet = {1:[1,8],2:[9,16],3:[17,24],4:[25,32],5:[33,40],6:[41,48],7:[49,56],8:[57,64]}
+topo_subnet = {1:[[1,4],[17,20],[33,36],[49,52]],2:[[5,8],[21,24],[37,40],[53,56]],3:[[9,12],[25,28],[41,44],[57,60]],4:[[13,16],[29,32],[45,48],[61,64]]}
 
 topo_core_back = back(topo_core)
 topo_distro_back = back(topo_distro)
 topo_access_back = back(topo_access)
-topo_subnet_back = back(topo_subnet)
+topo_subnet_back = {}
+
+for k in topo_subnet:
+    for l in topo_subnet[k]:
+        for i in range1(*l):
+            topo_subnet_back[i] = k
 
 class LinuxRouter( Node ):
     "A Node with IP forwarding enabled."
@@ -63,7 +68,7 @@ def generateFlows(net,topo,switches):
     subs = topo_subnet.keys()
     sdn_switch = [int(s[1:]) for s in switches]
     sdn_switch.sort()
-    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_dst={1},priority={2}{3},actions=set_field:{4}"->"eth_dst,{5}'
+    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_dst={1},priority={2}{3},actions=set_field:{4}"->"eth_dst,mod_vlan_vid:{5},{6}'
 
     flows = {}
     f = open("flows","w")
@@ -80,28 +85,23 @@ def generateFlows(net,topo,switches):
             if i == j:
                 if sw_i in sdn_switch:
                     hosts = topo_subnet[i]
-                    for h in range1(*hosts):
-                        host = 'h'+str(h)
-                        intf = topo[topo[host][0]][1]
-                        print flow.format('s'+str(sw_i),topo[host][2],3,',in_port='+intf,net.get(host).MAC(),'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
-                        print flow.format('s'+str(sw_i),topo[host][2],2,'',net.get(host).MAC(),'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
+                    for l in hosts:
+                        for h in range1(*l):
+                            host = 'h'+str(h)
+                            intf = topo[topo[host][0]][1]
+                            print flow.format('s'+str(sw_i),topo[host][2],3,',in_port='+intf,net.get(host).MAC(),topo[host][2].split('.')[2],'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
+                            print flow.format('s'+str(sw_i),topo[host][2],2,'',net.get(host).MAC(),topo[host][2].split('.')[2],'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
                 else:
                     switch = str(close(sw_i, sdn_switch))
                     flows[str(i)+'-'+str(j)] = switch
                     router = topo['s'+switch]
-                    hosts = topo_subnet[i]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
-                    for h in range1(*hosts):
-                        host = 'h'+str(h)
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),i,'IN_PORT')
             else:
                 if sw_i not in sdn_switch and sw_j not in sdn_switch:
                     switch = str(close(sw_i, sdn_switch))
                     flows[str(i)+'-'+str(j)] = switch
                     router = topo['s'+switch]
-                    hosts = topo_subnet[i]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),'IN_PORT')
-                    for h in range1(*hosts):
-                        host = 'h'+str(h)
+                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),i,'IN_PORT')
 
     print '>&2 printf "%.2f%%\r" ',(100.0*1/100)
     print '>&2 echo'
@@ -144,7 +144,7 @@ ip rule add to 10.0.4.1 pref 0 table local
     f.close()
 
     os.system('cat pbr.sh')
-    net.get('s1').cmd('sh pbr.sh')
+    # net.get('s1').cmd('sh pbr.sh')
 
 def printTopoDS(net,switches):
     topo = {}
@@ -216,16 +216,25 @@ def treeNet(net, switches):
                 h = net.addHost(hostName, defaultRoute=None, ip='10.0.{0}.2/24'.format(topo_subnet_back[i]))
             link = net.addLink(h, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
+    core_switches = topo_core.keys()
+    core_switches.sort()
+    i = 0
+
+    while i < len(core_switches)-1:
+        net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
+        i += 1
+
     info( '*** Starting network\n')
     net.build()
 
     for sub in topo_subnet:
-        count = 2
-        for i in range1(*topo_subnet[sub]):
-            hostName = 'h'+str(i)
-            h = net.get(hostName)
-            h.setIP('10.0.{0}.{1}/24'.format(sub, count))
-            count += 1
+        count = 1
+        for l in topo_subnet[sub]:
+            for i in range1(*l):
+                hostName = 'h'+str(i)
+                h = net.get(hostName)
+                h.setIP('10.0.{0}.{1}/24'.format(sub, count))
+                count += 1
 
     topo = printTopoDS(net, switches)
 
@@ -248,12 +257,45 @@ def treeNet(net, switches):
     info( '*** Post configure switches and hosts\n')
 
     for sub in topo_subnet:
-        for i in range1(*topo_subnet[sub]):
-            hostName = 'h'+str(i)
-            h = net.get(hostName)
-            h.cmd('sudo route add default gw 10.0.{0}.1 h{1}-eth0'.format(sub,i))
-            if len(switches) != 0:
-                h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
+        count = 250
+        for l in topo_subnet[sub]:
+            count += 1
+            for i in range1(*l):
+                hostName = 'h'+str(i)
+                h = net.get(hostName)
+                h.cmd('sudo route add default gw 10.0.{0}.{1} h{2}-eth0'.format(sub,count,i))
+                if len(switches) != 0:
+                    h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
+
+    #configure VLANs
+    vlans = [1,2,3,4]
+    c = 0
+    for i in range1(5,20):
+        sw = net.get('s'+str(i))
+        for inf in sw.intfs:
+            intf = sw.intfs[inf]
+            if 'lo' in str(intf):
+                continue
+            os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
+            if str(sw) in switches:
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks=5,{2}'.format(str(sw),intf,vlans[c]))
+            else:
+                os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(sw),intf,vlans[c]))
+            if inf == 1:
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2)))
+                if str(sw) in switches:
+                    os.system('sudo ovs-vsctl add-port {0} {1} trunks=5,{2}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2),vlans[c]))
+                else:
+                    os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2),vlans[c]))
+            if str(sw) not in str(intf.link.intf1):
+                sw1 = net.get(str(intf.link.intf1).split('-')[0])
+                for inf1 in sw1.intfs:
+                    intf1 = sw1.intfs[inf1]
+                    if 'lo' in str(intf1):
+                        continue
+                    os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw1),intf1))
+                    os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(sw1),intf1,vlans[c]))
+        c = (c+1)%4
 
     # generateFlows(net,topo,switches)
 

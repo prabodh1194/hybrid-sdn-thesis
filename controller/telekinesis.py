@@ -38,10 +38,12 @@ def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
 
     print _eth_src, _eth_dst, _ip_src, _ip_dst
 
-    if _ip_src.split('.')[2] == _ip_dst.split('.')[2] or _ip_dst.split('.')[3] != '1':
+    if _ip_src.split('.')[2] == _ip_dst.split('.')[2]:
         return -1
 
     print "Doing pout"
+
+    _ip_dst = _ip_src
 
     eth_src = [int('0x'+byte, 16) for byte in _eth_src.split(':')]
     eth_dst = [int('0x'+byte, 16) for byte in _eth_dst.split(':')]
