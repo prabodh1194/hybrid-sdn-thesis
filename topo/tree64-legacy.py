@@ -24,13 +24,11 @@ def back(topo):
             topo_back[i] = k
     return topo_back
 
-topo_core = {1:[5,12],2:[5,12],3:[13,20],4:[13,20]}
-topo_distro = {5:[21,22],6:[21,22],7:[23,24],8:[23,24],9:[25,26],10:[25,26],11:[27,28],12:[27,28],13:[29,30],14:[29,30],15:[31,32],16:[31,32],17:[33,34],18:[33,34],19:[35,36],20:[35,36]}
-topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
-        [11, 12], 27: [13, 14], 28: [15, 16], 29: [17, 18], 30: [19, 20], 31:
-        [21, 22], 32: [23, 24], 33: [25, 26], 34: [27, 28], 35: [29, 30], 36:
-        [31, 32]}
-topo_subnet = {1:[1,4],2:[5,8],3:[9,12],4:[13,16],5:[17,20],6:[21,24],7:[25,28],8:[29,32]}
+topo_core = {1:[5,8],2:[5,8],3:[9,12],4:[9,12]}
+topo_distro = {5:[13,14],6:[13,14],7:[15,16],8:[15,16],9:[17,18],10:[17,18],11:[19,20],12:[19,20]}
+topo_access = {13: [1, 2], 14: [3, 4], 15: [5, 6], 16: [7, 8], 17: [9, 10], 18:
+        [11, 12], 19: [13, 14], 20: [15, 16]}
+topo_subnet = {1:[1,4],2:[5,8],3:[9,12],4:[13,16]}
 
 topo_core_back = back(topo_core)
 topo_distro_back = back(topo_distro)
@@ -190,8 +188,6 @@ def treeNet(net, switches):
             except KeyError:
                 s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='secure' if switchName in switches else 'standalone')
             link = net.addLink(s, s_core, cls=TCLink, **hs1000)
-
-    pdb.set_trace()
 
     info( '*** Add access\n')
     for sw in topo_distro:
