@@ -1,0 +1,24 @@
+ip rule add to 10.0.1.251 lookup local pref 0
+ip rule add to 10.0.1.252 lookup local pref 0
+ip rule add to 10.0.1.253 lookup local pref 0
+ip rule add to 10.0.1.254 lookup local pref 0
+ip route del 10.0.1.0/24 dev vlan11
+ip route del 10.0.1.0/24 dev vlan21
+ip route del 10.0.1.0/24 dev vlan31
+ip route del 10.0.1.0/24 dev vlan41
+ip rule add from 10.0.1.0/24 iif vlan21 lookup 4 pref 1
+ip rule add from 10.0.1.0/24 iif vlan31 lookup 5 pref 1
+ip rule add from 10.0.1.0/24 iif vlan41 lookup 6 pref 1
+
+ip rule add iif vlan15 lookup 2 pref 1
+
+ip route add 0.0.0.0 dev s1-eth1 table 2
+
+ip route add 10.0.1.0/24 dev vlan11 table 3
+ip route add 10.0.2.0/24 dev vlan12 table 3
+ip route add 10.0.3.0/24 dev vlan13 table 3
+ip route add 10.0.4.0/24 dev vlan14 table 3
+
+ip route add 10.0.1.0/24 dev vlan25 table 4 proto kernel scope link src 10.0.1.252
+ip route add 10.0.1.0/24 dev vlan35 table 5 proto kernel scope link src 10.0.1.253
+ip route add 10.0.1.0/24 dev vlan45 table 6 proto kernel scope link src 10.0.1.254

@@ -24,8 +24,15 @@ def back(topo):
             topo_back[i] = k
     return topo_back
 
-topo_core = {1:[5,8],2:[9,12],3:[13,16],4:[17,20]}
-topo_distro = {5:[21,22],6:[23,24],7:[25,26],8:[27,28],9:[29,30],10:[31,32],11:[33,34],12:[35,36],13:[37,38],14:[39,40],15:[41,42],16:[43,44],17:[45,46],18:[47,48],19:[49,50],20:[51,52]}
+topo_vlan = {1:[5,6,9,10,13,14,17,18],2:[5,6,9,10,13,14,17,18],3:[7,8,11,12,15,16,19,20],4:[7,8,11,12,15,16,19,20]}
+
+topo_vlan_back = {}
+for vlan in topo_vlan:
+    for i in topo_vlan[vlan]:
+        topo_vlan_back[i] = topo_vlan_back.get(i,[]) + [vlan]
+
+topo_core = {1:[5,12],2:[5,12],3:[13,20],4:[13,20]}
+topo_distro = {5:[21,24],6:[21,24],7:[25,28],8:[25,28],9:[29,32],10:[29,32],11:[33,36],12:[33,36],13:[37,40],14:[37,40],15:[41,44],16:[41,44],17:[45,48],18:[45,48],19:[49,52],20:[49,52]}
 topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
         [11, 12], 27: [13, 14], 28: [15, 16], 29: [17, 18], 30: [19, 20], 31:
         [21, 22], 32: [23, 24], 33: [25, 26], 34: [27, 28], 35: [29, 30], 36:
@@ -184,14 +191,16 @@ def treeNet(net, switches):
 
     info( '*** Add core and distribution\n')
     for sw in topo_core:
-        s_core = net.addSwitch('s'+str(sw), cls=OVSKernelSwitch, failMode='standalone')
+        s_core = net.addSwitch('s'+str(sw), cls=OVSKernelSwitch, failMode='standalone', stp=True)
         for i in range1(*topo_core[sw]):
             switchName = 's'+str(i)
             s = None
             try:
                 s = net.get(switchName)
             except KeyError:
-                s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='secure' if switchName in switches else 'standalone')
+                s = net.addSwitch(switchName, cls=OVSKernelSwitch,
+                        failMode='secure' if switchName in switches else
+                        'standalone',stp=True)
             link = net.addLink(s, s_core, cls=TCLink, **hs1000)
 
     info( '*** Add access\n')
@@ -202,7 +211,8 @@ def treeNet(net, switches):
             try:
                 s = net.get(switchName)
             except KeyError:
-                s = net.addSwitch(switchName, cls=OVSKernelSwitch, failMode='standalone')
+                s = net.addSwitch(switchName, cls=OVSKernelSwitch,
+                        failMode='standalone',stp=True)
             link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Add hosts\n')
@@ -268,34 +278,35 @@ def treeNet(net, switches):
                     h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
 
     #configure VLANs
-    vlans = [1,2,3,4]
+    vlans = [1,1,2,2,3,3,4,4]
     c = 0
-    for i in range1(5,20):
+    for i in range1(21,52):
         sw = net.get('s'+str(i))
         for inf in sw.intfs:
             intf = sw.intfs[inf]
             if 'lo' in str(intf):
                 continue
             os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
-            if str(sw) in switches:
-                os.system('sudo ovs-vsctl add-port {0} {1} trunks=5,{2}'.format(str(sw),intf,vlans[c]))
-            else:
-                os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(sw),intf,vlans[c]))
-            if inf == 1:
-                os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2)))
-                if str(sw) in switches:
-                    os.system('sudo ovs-vsctl add-port {0} {1} trunks=5,{2}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2),vlans[c]))
-                else:
-                    os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(intf.link.intf2).split('-')[0],str(intf.link.intf2),vlans[c]))
-            if str(sw) not in str(intf.link.intf1):
-                sw1 = net.get(str(intf.link.intf1).split('-')[0])
-                for inf1 in sw1.intfs:
-                    intf1 = sw1.intfs[inf1]
-                    if 'lo' in str(intf1):
-                        continue
-                    os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw1),intf1))
-                    os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(sw1),intf1,vlans[c]))
-        c = (c+1)%4
+            os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(str(sw),intf,vlans[c]))
+            if str(sw) in str(intf.link.intf1):
+                sw1 = str(intf.link.intf2).split('-')[0]
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
+                os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(sw1,intf.link.intf2,vlans[c]))
+        c = (c+1)%8
+
+    #configure trunk
+    for s in topo_vlan_back:
+        sw = net.get('s'+str(s))
+        for inf in sw.intfs:
+            intf = sw.intfs[inf]
+            if 'lo' in str(intf):
+                continue
+            if str(sw) in str(intf.link.intf1):
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s]))))
+                sw1 = str(intf.link.intf2).split('-')[0]
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s]))))
 
     # generateFlows(net,topo,switches)
 

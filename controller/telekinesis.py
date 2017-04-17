@@ -43,8 +43,6 @@ def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
 
     print "Doing pout"
 
-    _ip_dst = _ip_src
-
     eth_src = [int('0x'+byte, 16) for byte in _eth_src.split(':')]
     eth_dst = [int('0x'+byte, 16) for byte in _eth_dst.split(':')]
     eth_type = [0x08, 0x06]
@@ -53,11 +51,16 @@ def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
     arp_req = [0x00, 0x01]
     ip_src = [int(byte) for byte in _ip_src.split('.')]
     ip_dst = [int(byte) for byte in _ip_dst.split('.')]
+    vlan_type = [0x81,0x00]
+    vlan = [0x00,0x01]
 
     # arpframe
         ## ETHERNET
         # destination MAC addr
         # source MAC addr
+        # vlan_type
+        ##  VLAN
+        # vlan
         # ETHERNET_PROTOCOL_TYPE_ARP,
         ## ARP
         # ARP_PROTOCOL_TYPE_ETHERNET_IP,
@@ -67,7 +70,7 @@ def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
         # target hardware addr
         # target IP addr
 
-    arp_frame = eth_dst+eth_src+eth_type+arp_type+arp_reply+eth_src+ip_src+eth_dst+ip_dst
+    arp_frame = eth_dst+eth_src+vlan_type+vlan+eth_type+arp_type+arp_reply+eth_src+ip_src+eth_dst+ip_dst
 
     # Construct Ethernet packet with an IPv4 ICMP PING request as payload
     r = pack(arp_frame)
