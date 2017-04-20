@@ -52,7 +52,7 @@ def _arp_reply(_eth_src, _eth_dst, _ip_src, _ip_dst):
     ip_src = [int(byte) for byte in _ip_src.split('.')]
     ip_dst = [int(byte) for byte in _ip_dst.split('.')]
     vlan_type = [0x81,0x00]
-    vlan = [0x00,0x01]
+    vlan = [0x00,0x05]
 
     # arpframe
         ## ETHERNET
@@ -172,11 +172,11 @@ class SimpleSwitch13(app_manager.RyuApp):
         if pkt_arp:
             pkt_type = "arp"
             data = -1
-            if in_port == 1:
-                data = _arp_reply(datapath.ports[1].hw_addr, src, pkt_arp.dst_ip, pkt_arp.src_ip)
+            self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
+            if 'eth1' in datapath.ports[in_port].name:
+                data = _arp_reply(datapath.ports[in_port].hw_addr, src, pkt_arp.dst_ip, pkt_arp.src_ip)
             if data != -1:
                 self.send_packet_out(datapath,msg.buffer_id,in_port,data)
-                self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
                 return
         if pkt_icmp:
             pkt_type = "icmp"

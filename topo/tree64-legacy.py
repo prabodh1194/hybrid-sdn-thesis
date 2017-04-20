@@ -8,7 +8,7 @@ Create a 64-host network on legacy switch, and run the CLI on it.
 from mininet.net import Mininet
 from mininet.cli import CLI
 from mininet.node import Controller, RemoteController, OVSController
-from mininet.node import OVSKernelSwitch, OVSSwitch, Host, Node
+from mininet.node import OVSSwitch, Host, Node
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
@@ -24,15 +24,15 @@ def back(topo):
             topo_back[i] = k
     return topo_back
 
-topo_vlan = {1:[5,6,9,10,13,14,17,18],2:[5,6,9,10,13,14,17,18],3:[7,8,11,12,15,16,19,20],4:[7,8,11,12,15,16,19,20]}
+topo_vlan = {1:[5,9,13,17],2:[6,10,14,18],3:[7,12,15,19],4:[8,12,16,20]}
 
 topo_vlan_back = {}
 for vlan in topo_vlan:
     for i in topo_vlan[vlan]:
         topo_vlan_back[i] = topo_vlan_back.get(i,[]) + [vlan]
 
-topo_core = {1:[5,12],2:[5,12],3:[13,20],4:[13,20]}
-topo_distro = {5:[21,24],6:[21,24],7:[25,28],8:[25,28],9:[29,32],10:[29,32],11:[33,36],12:[33,36],13:[37,40],14:[37,40],15:[41,44],16:[41,44],17:[45,48],18:[45,48],19:[49,52],20:[49,52]}
+topo_core = {1:[5,8],2:[9,12],3:[13,16],4:[17,20]}
+topo_distro = {5:[21,22],6:[23,24],7:[25,26],8:[27,28],9:[29,30],10:[31,32],11:[33,34],12:[35,36],13:[37,38],14:[39,40],15:[41,42],16:[43,44],17:[45,46],18:[47,48],19:[49,50],20:[51,52]}
 topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
         [11, 12], 27: [13, 14], 28: [15, 16], 29: [17, 18], 30: [19, 20], 31:
         [21, 22], 32: [23, 24], 33: [25, 26], 34: [27, 28], 35: [29, 30], 36:
@@ -191,16 +191,16 @@ def treeNet(net, switches):
 
     info( '*** Add core and distribution\n')
     for sw in topo_core:
-        s_core = net.addSwitch('s'+str(sw), cls=OVSKernelSwitch, failMode='standalone', stp=True)
+        s_core = net.addSwitch('s'+str(sw), cls=OVSSwitch, failMode='standalone')
         for i in range1(*topo_core[sw]):
             switchName = 's'+str(i)
             s = None
             try:
                 s = net.get(switchName)
             except KeyError:
-                s = net.addSwitch(switchName, cls=OVSKernelSwitch,
+                s = net.addSwitch(switchName, cls=OVSSwitch,
                         failMode='secure' if switchName in switches else
-                        'standalone',stp=True)
+                        'standalone')
             link = net.addLink(s, s_core, cls=TCLink, **hs1000)
 
     info( '*** Add access\n')
@@ -211,8 +211,8 @@ def treeNet(net, switches):
             try:
                 s = net.get(switchName)
             except KeyError:
-                s = net.addSwitch(switchName, cls=OVSKernelSwitch,
-                        failMode='standalone',stp=True)
+                s = net.addSwitch(switchName, cls=OVSSwitch,
+                        failMode='standalone')
             link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs100)
 
     info( '*** Add hosts\n')
@@ -303,10 +303,10 @@ def treeNet(net, switches):
                 continue
             if str(sw) in str(intf.link.intf1):
                 os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
-                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s]))))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}{3}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s])),',5' if str(sw) in switches else ''))
                 sw1 = str(intf.link.intf2).split('-')[0]
                 os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
-                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s]))))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}{3}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s])),',5' if str(sw) in switches else ''))
 
     # generateFlows(net,topo,switches)
 

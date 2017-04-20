@@ -4,18 +4,18 @@
 #sudo ovs-vsctl del-port s1 s1-eth1
 #sudo ovs-vsctl add-port s1 s1-eth1 trunks=10,20
 
-sudo ovs-vsctl del-port s1 s1-eth9
-sudo ovs-vsctl add-port s1 s1-eth9 trunks=1,2,3,4,5
-sudo ovs-vsctl del-port s2 s2-eth9
-sudo ovs-vsctl add-port s2 s2-eth9 trunks=1,2,3,4,5
-sudo ovs-vsctl del-port s2 s2-eth10
-sudo ovs-vsctl add-port s2 s2-eth10 trunks=1,2,3,4,5
-sudo ovs-vsctl del-port s3 s3-eth9
-sudo ovs-vsctl add-port s3 s3-eth9 trunks=1,2,3,4,5
-sudo ovs-vsctl del-port s3 s3-eth10
-sudo ovs-vsctl add-port s3 s3-eth10 trunks=1,2,3,4,5
-sudo ovs-vsctl del-port s4 s4-eth9
-sudo ovs-vsctl add-port s4 s4-eth9 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s1 s1-eth5
+sudo ovs-vsctl add-port s1 s1-eth5 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s2 s2-eth5
+sudo ovs-vsctl add-port s2 s2-eth5 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s2 s2-eth6
+sudo ovs-vsctl add-port s2 s2-eth6 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s3 s3-eth5
+sudo ovs-vsctl add-port s3 s3-eth5 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s3 s3-eth6
+sudo ovs-vsctl add-port s3 s3-eth6 trunks=1,2,3,4,5
+sudo ovs-vsctl del-port s4 s4-eth5
+sudo ovs-vsctl add-port s4 s4-eth5 trunks=1,2,3,4,5
 
 sudo ovs-vsctl add-port s1 vlan11 tag=1 -- set interface vlan11 type=internal
 sudo ovs-vsctl add-port s1 vlan12 tag=2 -- set interface vlan12 type=internal
