@@ -18,7 +18,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.controller import dpset
-from ryu.ofproto import ofproto_v1_3
+from ryu.ofproto import ofproto_v1_3,ether
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
@@ -196,7 +196,18 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             out_port = ofproto.OFPP_FLOOD
 
+        eth_VLAN = ether.ETH_TYPE_8021Q
+        s_vid = 1
+        f = parser.OFPMatchField.make( ofproto.OXM_OF_VLAN_VID, s_vid)
+        vlan_action = [parser.OFPActionPushVlan(eth_VLAN),
+                parser.OFPActionSetField(f)]
         actions = [parser.OFPActionOutput(out_port)]
+
+        if pkt_arp:
+            if in_port!=4:
+                actions=vlan_action+actions
+            else:
+                actions=[parser.OFPActionPopVlan()]+actions
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
