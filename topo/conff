@@ -42,4 +42,4 @@ ip rule add from 10.0.3.0/24 iif vlan43 lookup 5 pref 1
 ip rule add from 10.0.4.0/24 iif vlan44 lookup 5 pref 1
 ip rule add iif vlan45 lookup 9 pref 2
 
-sh route.sh
+bash route.sh

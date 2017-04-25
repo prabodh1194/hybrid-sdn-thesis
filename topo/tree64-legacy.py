@@ -13,7 +13,7 @@ from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
 from math import ceil
-import os,sys,argparse,re,time,pprint,json,pdb
+import os,sys,argparse,re,time,json,pdb
 
 range1 = lambda start, end: range(start, end+1)
 
@@ -213,7 +213,7 @@ def treeNet(net, switches):
             except KeyError:
                 s = net.addSwitch(switchName, cls=OVSSwitch,
                         failMode='standalone')
-            link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs100)
+            link = net.addLink(s, net.get('s'+str(sw)), cls=TCLink, **hs1000)
 
     info( '*** Add hosts\n')
     for sw in topo_access:
@@ -228,8 +228,8 @@ def treeNet(net, switches):
 
     core_switches = topo_core.keys()
     core_switches.sort()
-    i = 0
 
+    i = 0
     while i < len(core_switches)-1:
         net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
         i += 1
@@ -313,18 +313,23 @@ def treeNet(net, switches):
 def startTG(net):
     'Traffic generation'
 
-    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-            [17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31, 32]]
+    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],
+            [33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64]]
     flag = 0
 
     for i in range(len(hosts[0])):
         flag ^= 1
 
+        if i&1 == 0:
+            continue
+
         serv = net.get('h'+str(hosts[flag][i]))
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
+        print cli,'->',serv
+
         serv.cmd('ITGRecv &')
-        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
         # cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -z 12648 -Fs ps -Ft idts -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
@@ -348,11 +353,16 @@ if __name__ == '__main__':
     net = Mininet( topo=None, build=False, ipBase='10.0.0.0/8')
     treeNet(net, set(args.switches))
 
-    print args.stats
+    os.system('sh vlan.sh')
+    os.system('bash route.sh')
+
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 54 -B 40960 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &> {0}.out &'.format(str(switch.intfs[i])))
+        for i in range(1,6):
+            for j in range(1,5):
+                os.system('tcpdump -s 54 -B 40960 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w ../../../stat/vlan{0}{1} &> vlan{0}{1}.out &'.format(j,i))
 
     os.system('sh flow.sh')
 
@@ -369,7 +379,7 @@ if __name__ == '__main__':
 
     setLogLevel( 'warning' )
     k = ','.join([] if args.switches == {} else args.switches)
-    # startTG(net)
+    startTG(net)
 
     # poll for iperfs to die
     time.sleep(10)
