@@ -1,8 +1,8 @@
 import sys, os, re, pprint, json, pdb
 from math import ceil
 
-def min(a,b):
-    return a if a<b else b
+def min(a, b):
+    return a if a < b else b
 
 pattern = "([0-9:.]+).*IP.* ([0-9.]+) > ([0-9.]+):.*length ([0-9.]+)"
 
@@ -22,7 +22,7 @@ files = files.split('\n')
 print >>sys.stderr, files
 
 for tcp_file in files:
-    f = open('$HOME/prabodh/stat/'+tcp_file, 'r')
+    f = open(os.path.expanduser('~')+'/prabodh/stat/'+tcp_file, 'r')
     print >>sys.stderr, tcp_file
     tcp_file = tcp_file[1:]
 
@@ -53,20 +53,20 @@ for tcp_file in files:
         if flag == 0:
             flag -= 1
             if vlan:
-                packet = line[25:29]
+                packet = line[20:24]+line[25:29]
             else:
-                packet = line[15:19]
+                packet = line[10:14]+line[15:19]
 
             if vlan == 5 and re.search('s[1-4]-eth[56]',tcp_file) is not None:
                 continue
 
             if packet not in d:
-                d[packet] = {src:{tcp_file:[(seconds,size,vlan)]}}
+                d[packet] = {src:{tcp_file:[(seconds,size)]}}
             else:
                 if src not in d[packet]:
-                     d[packet][src] = {tcp_file:[(seconds,size,vlan)]}
+                     d[packet][src] = {tcp_file:[(seconds,size)]}
                 else:
-                    d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [(seconds,size,vlan)]
+                    d[packet][src][tcp_file] = d[packet][src].get(tcp_file,[]) + [(seconds,size)]
             vlan = 0
 
 for packet in d: # go through every recorded packet
@@ -74,22 +74,15 @@ for packet in d: # go through every recorded packet
         for intf in d[packet][host]:
             z = []
             for i in d[packet][host][intf]:
-                z += [(i[0]-min_seconds,i[1],i[2])]
+                z += [(i[0]-min_seconds,i[1])]
             d[packet][host][intf] = z
 
-pprint.pprint(d)
+# pprint.pprint(d)
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
 
 f = open(TOPO_FILE)
 topo = json.load(f)
-
-flows = {}
-f = open(FLOW_FILE)
-try:
-    flows = json.load(f)
-except:
-    flows = {}
 
 traversal = {}
 hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
@@ -148,102 +141,73 @@ f_t = open('traversal','r')
 traversal = json.load(f_t)
 print >> sys.stderr, pprint.pformat(traversal)
 
-drop_file = open('$HOME/prabodh/stat/drop','a')
+drop_file = open(os.path.expanduser('~')+'/prabodh/stat/drop','a')
 
 totalDrop = 0
-drop = {'totalDrop':0}
 link_speed = {}
 link_util  = {}
 link_bw = {}
-latency = {}
+link_latency = {}
 
 i = 0
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
-        while i < len(traversal[host]): # for a host, go through all interfaces in order
+        i = 0
+        while i < len(traversal[host])-1: # for a host, go through all interfaces in order
             intf = traversal[host][i]
             eth1 = traversal[host][i+1]
-            if intf in d[packet][host] and eth1 not in d[packet][host]:
-                # print >> drop_file,intf,packet,host
-                drop['totalDrop'] += 1
-                if 'vlan' in intf or 'vlan' in eth1:
-                    i += 1
-                else:
-                    i += 2
-                continue
-            else:
-                if 'vlan' in intf:
-                    sw = intf
-                else:
-                    sw = intf[1:intf.find('-')]
 
-                if sw not in latency:
-                    latency[sw] = {'latency':0,'packets':0}
+            if intf in d[packet][host] and eth1 in d[packet][host]:
+                p1 = 0
+                p2 = 0
+                try:
+                    p1 = d[packet][host][intf].pop(0)
+                    p2 = d[packet][host][eth1][0]
 
-                latency[sw]['packets'] += 1
-                if eth1 == intf:
-                    try:
-                        latency[sw]['latency'] += (d[packet][host][eth1][1][0] - d[packet][host][intf][0][0])
-                    except:
-                        latency[sw]['packets'] -= 1
-                else:
-                    latency[sw]['latency'] += (d[packet][host][eth1][0][0] - d[packet][host][intf][0][0])
-
-                if i-1 >= 0:
-                    p1 = 0
-                    p2 = 0
-                    try:
-                        p1 = d[packet][host][intf].pop(0)
-                        p2 = d[packet][host][traversal[host][i-1]].pop(0)
-                    except:
-                        if 'vlan' in intf or 'vlan' in eth1:
-                            i += 1
-                        else:
-                            i += 2
+                    if p2[0] < p1[0]:
+                        d[packet][host][intf].insert(p1, 0)
+                        i+=1
                         continue
+                except:
+                    i+=1
+                    continue
 
-                    link = traversal[host][i-1]+":"+intf
+                link = intf+":"+eth1
 
-                    if link not in link_speed:
-                        link_speed[link] = {}
-                    second = str(int(ceil(p2[0]/1000)))
+                if link not in link_speed:
+                    link_speed[link] = {}
+                second = str(int(ceil(p2[0]/1000)))
 
-                    if second not in link_speed[link]:
-                        link_speed[link][second] = []
-                    link_speed[link][second] += [(p1[0] - p2[0],p1[1])]
-
-            if 'vlan' in intf or 'vlan' in eth1:
-                i += 1
-            else:
-                i += 2
-
-for sw in latency:
-    latency[sw] = latency[sw]['latency']/latency[sw]['packets']
+                if second not in link_speed[link]:
+                    link_speed[link][second] = []
+                link_speed[link][second] += [(p2[0] - p1[0],p1[1])]
+            i+=1
 
 for link in link_speed:
     link_util[link] = 0
     link_bw[link] = {}
+    link_latency[link] = 0
     bw = 0
     for second in link_speed[link]:
         link_util[link] += (len(link_speed[link][second]))
         link_bw[link][second] = 0
         for t in link_speed[link][second]:
+            link_latency[link] += t[0]
             link_bw[link][second] += t[1]
         link_bw[link][second] /= (1024*1024.)
         bw += link_bw[link][second]
-    # link_bw[link] = bw/len(link_speed[link])
+    link_latency[link] /= link_util[link]
+    link_bw[link] = bw/len(link_speed[link])
 
 for link in link_speed:
-    link_speed[link] = (link_util[link],link_bw[link])
+    link_speed[link] = (link_util[link],link_latency[link],link_bw[link])
 
 stdout = sys.stdout
 sys.stdout = drop_file
 print header
-pprint.pprint(drop)
 # pprint.pprint(link_util)
 # pprint.pprint(link_bw)
 pprint.pprint(link_speed)
-pprint.pprint(latency)
 pprint.pprint(host_ee)
 sys.stdout = stdout
 
