@@ -16,13 +16,13 @@ packet = ''
 header = sys.argv[1]
 
 d = {}
-files = os.popen('ls -1 ../../../stat | grep "vlan\|s[0-9]\+-"').read()[:-1]
+files = os.popen('ls -1 $HOME/prabodh/stat | grep "vlan\|s[0-9]\+-"').read()[:-1]
 files = files.split('\n')
 
 print >>sys.stderr, files
 
 for tcp_file in files:
-    f = open('../../../stat/'+tcp_file, 'r')
+    f = open('$HOME/prabodh/stat/'+tcp_file, 'r')
     print >>sys.stderr, tcp_file
     tcp_file = tcp_file[1:]
 
@@ -148,7 +148,7 @@ f_t = open('traversal','r')
 traversal = json.load(f_t)
 print >> sys.stderr, pprint.pformat(traversal)
 
-drop_file = open('../../../stat/drop','a')
+drop_file = open('$HOME/prabodh/stat/drop','a')
 
 totalDrop = 0
 drop = {'totalDrop':0}

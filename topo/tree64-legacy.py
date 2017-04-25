@@ -329,8 +329,8 @@ def startTG(net):
         print cli,'->',serv
 
         serv.cmd('ITGRecv &')
-        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 2048 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
-        # cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -z 12648 -Fs ps -Ft idts -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 2048 -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
+        # cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -z 12648 -Fs ps -Ft idts -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
 
@@ -359,10 +359,10 @@ if __name__ == '__main__':
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -s 54 -B 40960 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &> {0}.out &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 54 -B 40960 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &> {0}.out &'.format(str(switch.intfs[i])))
         for i in range(1,6):
             for j in range(1,5):
-                os.system('tcpdump -s 54 -B 40960 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w ../../../stat/vlan{0}{1} &> vlan{0}{1}.out &'.format(j,i))
+                os.system('tcpdump -s 54 -B 40960 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &> vlan{0}{1}.out &'.format(j,i))
 
     os.system('sh flow.sh')
 
