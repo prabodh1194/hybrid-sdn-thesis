@@ -204,7 +204,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(out_port)]
 
         if pkt_arp:
-            if in_port!=4:
+            if in_port!=5:
                 actions=vlan_action+actions
             else:
                 actions=[parser.OFPActionPopVlan()]+actions
