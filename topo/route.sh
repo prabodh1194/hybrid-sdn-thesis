@@ -61,14 +61,14 @@ ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=3,nw_dst=10.0.4.1,actions
 ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=3,nw_dst=10.0.4.2,actions=output:10
 ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=3,nw_dst=10.0.4.3,actions=output:10
 ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=3,nw_dst=10.0.4.4,actions=output:10
-ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.1.0/24,actions=mod_vlan_vid:4,set_field:$vlan14"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
-ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.2.0/24,actions=mod_vlan_vid:1,set_field:$vlan11"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
-ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.3.0/24,actions=mod_vlan_vid:2,set_field:$vlan12"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
-ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.4.0/24,actions=mod_vlan_vid:3,set_field:$vlan13"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
-ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.1.0/24,actions=mod_vlan_vid:4,set_field:$vlan24"->"eth_dst,set_field:$s1eth1"->"eth_src,output:10
-ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.2.0/24,actions=mod_vlan_vid:1,set_field:$vlan21"->"eth_dst,set_field:$s1eth1"->"eth_src,output:10
-ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.3.0/24,actions=mod_vlan_vid:2,set_field:$vlan22"->"eth_dst,set_field:$s1eth1"->"eth_src,output:10
-ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.4.0/24,actions=mod_vlan_vid:3,set_field:$vlan23"->"eth_dst,set_field:$s1eth1"->"eth_src,output:10
+ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.1.0/24,actions=mod_vlan_vid:4,set_field:$vlan24"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
+ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.2.0/24,actions=mod_vlan_vid:1,set_field:$vlan21"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
+ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.3.0/24,actions=mod_vlan_vid:2,set_field:$vlan22"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
+ovs-ofctl -OOpenFlow13 add-flow s5 ip,priority=2,nw_src=10.0.4.0/24,actions=mod_vlan_vid:3,set_field:$vlan23"->"eth_dst,set_field:$s1eth1"->"eth_src,goto_table:1
+ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.1.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.2.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.3.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s5 table=1,ip,priority=2,nw_src=10.0.4.0/24,actions=IN_PORT,output:9,output:10
 
 ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=4,nw_dst=10.0.1.9,in_port=3,actions=strip_vlan,set_field:00:00:00:00:00:21"->"eth_dst,set_field:$vlan31"->"eth_src,IN_PORT
 ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=4,nw_dst=10.0.1.10,in_port=3,actions=strip_vlan,set_field:00:00:00:00:00:22"->"eth_dst,set_field:$vlan31"->"eth_src,IN_PORT
@@ -106,7 +106,7 @@ ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=2,nw_src=10.0.1.0/24,actions=mod
 ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=2,nw_src=10.0.2.0/24,actions=mod_vlan_vid:1,set_field:$vlan31"->"eth_dst,set_field:$s3eth1"->"eth_src,goto_table:1
 ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=2,nw_src=10.0.3.0/24,actions=mod_vlan_vid:2,set_field:$vlan32"->"eth_dst,set_field:$s3eth1"->"eth_src,goto_table:1
 ovs-ofctl -OOpenFlow13 add-flow s13 ip,priority=2,nw_src=10.0.4.0/24,actions=mod_vlan_vid:3,set_field:$vlan33"->"eth_dst,set_field:$s3eth1"->"eth_src,goto_table:1
-ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.1.0/24,actions=mod_vlan_vid:4,set_field:$vlan44"->"eth_dst,set_field:$s3eth1"->"eth_src,output:9,output:10
-ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.2.0/24,actions=mod_vlan_vid:1,set_field:$vlan41"->"eth_dst,set_field:$s3eth1"->"eth_src,output:9,output:10
-ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.3.0/24,actions=mod_vlan_vid:2,set_field:$vlan42"->"eth_dst,set_field:$s3eth1"->"eth_src,output:9,output:10
-ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.4.0/24,actions=mod_vlan_vid:3,set_field:$vlan43"->"eth_dst,set_field:$s3eth1"->"eth_src,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.1.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.2.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.3.0/24,actions=IN_PORT,output:9,output:10
+ovs-ofctl -OOpenFlow13 add-flow s13 table=1,ip,priority=2,nw_src=10.0.4.0/24,actions=IN_PORT,output:9,output:10

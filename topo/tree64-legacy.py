@@ -162,7 +162,7 @@ def printTopoDS(net,switches):
             continue
         i1 = str(l.intf1.node)
         i2 = str(l.intf2.node)
-        topo[i1] = (i2,re.search(pattern,str(l.intf2)).group(1),l.intf1.IP())
+        topo[i1] = topo.get(i1,[])+[(i2,re.search(pattern,str(l.intf2)).group(1),l.intf1.IP())]
 
     stdout = sys.stdout
     sys.stdout = open(TOPO_FILE, 'w+')
@@ -262,13 +262,15 @@ def treeNet(net, switches):
             info('*** switch connected to controller ',switch,'\n')
             switch.start([c0])
             os.system('sudo ovs-vsctl set bridge \"'+str(switch)+'\" protocols=OpenFlow13')
-            os.system('sudo ovs-vsctl set bridge \"'+str(switch)+'\" other_config:stp-priority=0x1')
-            #os.system('sudo ovs-vsctl set port \"'+str(switch)+'-eth1\" other_config:stp-path-cost=0x2')
+
+            for pa in topo[str(switch)]:
+                os.system('sudo ovs-vsctl set port \"{0}-eth{1}\" other_config:stp-path-cost=2'.format(pa[0],pa[1]))
+
         else:
             switch.start([])
             no = str(switch)[1:]
-            #if no in topo_distro:
-            #    os.system('sudo ovs-vsctl set port \"'+str(switch)+'-eth1\" other_config:stp-path-cost=0x2')
+            if no in topo_core:
+                os.system('sudo ovs-vsctl set bridge \"'+str(switch)+'-eth1\" other_config:stp-priority=40000')
 
     info( '*** Post configure switches and hosts\n')
 

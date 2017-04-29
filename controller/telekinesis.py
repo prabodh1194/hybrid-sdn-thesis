@@ -20,7 +20,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.controller import dpset
 from ryu.ofproto import ofproto_v1_3,ether
 from ryu.lib.packet import packet
-from ryu.lib.packet import ethernet
+from ryu.lib.packet import ethernet, vlan
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import arp
 from ryu.lib.packet import tcp
@@ -198,6 +198,12 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         eth_VLAN = ether.ETH_TYPE_8021Q
         s_vid = 1
+        try:
+            s_vid = pkt.get_protocols(vlan.vlan)[0].vid
+        except:
+            s_vid = 1
+            if pkt_arp:
+                s_vid = int(pkt_arp.dst_ip.split('.')[2])
         f = parser.OFPMatchField.make( ofproto.OXM_OF_VLAN_VID, s_vid)
         vlan_action = [parser.OFPActionPushVlan(eth_VLAN),
                 parser.OFPActionSetField(f)]
