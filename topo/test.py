@@ -3,7 +3,7 @@ import os
 
 os.system('sudo mn -c')
 
-combo = ['s5 s13']
+combo = ['s5']
 # combo = [' ']
 
 for s in combo:
