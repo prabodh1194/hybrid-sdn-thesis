@@ -192,6 +192,10 @@ def treeNet(net, switches):
     info( '*** Add core and distribution\n')
     for sw in topo_core:
         s_core = net.addSwitch('s'+str(sw), cls=OVSSwitch, failMode='standalone')
+
+        if sw == 2:
+            link = net.addLink(net.get('s5'), s_core, cls=TCLink, **hs1000)
+
         for i in range1(*topo_core[sw]):
             switchName = 's'+str(i)
             s = None
@@ -202,6 +206,9 @@ def treeNet(net, switches):
                         failMode='secure' if switchName in switches else
                         'standalone')
             link = net.addLink(s, s_core, cls=TCLink, **hs1000)
+
+        if sw == 4:
+            link = net.addLink(net.get('s17'), net.get('s3'), cls=TCLink, **hs1000)
 
     info( '*** Add access\n')
     for sw in topo_distro:
@@ -231,7 +238,8 @@ def treeNet(net, switches):
 
     i = 0
     while i < len(core_switches)-1:
-        net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
+        if core_switches[i] == 2 and core_switches[i+1] == 3:
+            net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
         i += 1
 
     info( '*** Starting network\n')
@@ -303,10 +311,10 @@ def treeNet(net, switches):
                 continue
             if str(sw) in str(intf.link.intf1):
                 os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
-                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}{3}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s])),',5' if str(sw) in switches else ''))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s]))))
                 sw1 = str(intf.link.intf2).split('-')[0]
                 os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
-                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}{3}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s])),',5' if str(sw) in switches else ''))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s]))))
 
     # generateFlows(net,topo,switches)
 
@@ -327,6 +335,8 @@ def startTG(net):
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
         print cli,'->',serv
+
+        serv.cmd('ping -c1 {0}'.format(cli.IP()))
 
         serv.cmd('ITGRecv &')
         cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))

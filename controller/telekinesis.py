@@ -171,22 +171,12 @@ class SimpleSwitch13(app_manager.RyuApp):
         pkt_type = ""
         if pkt_arp:
             pkt_type = "arp"
-            data = -1
-            self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
-            if 'eth1' in datapath.ports[in_port].name:
-                data = _arp_reply(datapath.ports[in_port].hw_addr, src, pkt_arp.dst_ip, pkt_arp.src_ip)
-            if data != -1:
-                self.send_packet_out(datapath,msg.buffer_id,in_port,data)
-                return
         if pkt_icmp:
             pkt_type = "icmp"
         if pkt_tcp:
             pkt_type = "tcp"
         if pkt_udp:
             pkt_type = "udp"
-
-        if ("33" not in [dst[:2], src[:2]]) and ("ff" not in [dst[:2], src[:2]]): #supress random flood packets
-            self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, pkt_type)
 
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = in_port
@@ -196,18 +186,37 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             out_port = ofproto.OFPP_FLOOD
 
+        if ("33" not in [dst[:2], src[:2]]) and ("ff" not in [dst[:2], src[:2]]): #supress random flood packets
+            self.logger.info("packet in %s %s %s %s %s %s", dpid, src, dst, in_port, out_port, pkt_type)
+
         eth_VLAN = ether.ETH_TYPE_8021Q
         s_vid = 1
+        try:
+            s_vid = pkt.get_protocols(vlan.vlan)[0].vid
+        except:
+            s_vid = 1
+            if pkt_arp:
+                s_vid = int(pkt_arp.dst_ip.split('.')[2])
         f = parser.OFPMatchField.make( ofproto.OXM_OF_VLAN_VID, s_vid)
         vlan_action = [parser.OFPActionPushVlan(eth_VLAN),
                 parser.OFPActionSetField(f)]
-        actions = [parser.OFPActionOutput(out_port)]
+        out_actions = [parser.OFPActionOutput(out_port)]
+        actions = []
 
         if pkt_arp:
-            if in_port!=5:
-                actions=vlan_action+actions
+            if in_port in [7,8] and out_port in [3,4]:
+                actions=[parser.OFPActionPopVlan()]+out_actions
+            elif out_port == ofproto.OFPP_FLOOD:
+                actions=[parser.OFPActionPopVlan()]+out_actions
+                out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+                                          in_port=in_port, actions=actions)
+                datapath.send_msg(out)
+                actions=vlan_action+out_actions
+                out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+                                          in_port=in_port, actions=actions)
+                datapath.send_msg(out)
             else:
-                actions=[parser.OFPActionPopVlan()]+actions
+                actions=vlan_action+out_actions
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
