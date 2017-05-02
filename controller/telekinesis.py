@@ -200,23 +200,13 @@ class SimpleSwitch13(app_manager.RyuApp):
         f = parser.OFPMatchField.make( ofproto.OXM_OF_VLAN_VID, s_vid)
         vlan_action = [parser.OFPActionPushVlan(eth_VLAN),
                 parser.OFPActionSetField(f)]
-        out_actions = [parser.OFPActionOutput(out_port)]
-        actions = []
+        actions = [parser.OFPActionOutput(out_port)]
 
         if pkt_arp:
-            if in_port in [7,8] and out_port in [3,4]:
-                actions=[parser.OFPActionPopVlan()]+out_actions
-            elif out_port == ofproto.OFPP_FLOOD:
-                actions=[parser.OFPActionPopVlan()]+out_actions
-                out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                          in_port=in_port, actions=actions)
-                datapath.send_msg(out)
-                actions=vlan_action+out_actions
-                out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                          in_port=in_port, actions=actions)
-                datapath.send_msg(out)
+            if in_port!=5:
+                actions=vlan_action+actions
             else:
-                actions=vlan_action+out_actions
+                actions=[parser.OFPActionPopVlan()]+actions
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:

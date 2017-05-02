@@ -193,9 +193,6 @@ def treeNet(net, switches):
     for sw in topo_core:
         s_core = net.addSwitch('s'+str(sw), cls=OVSSwitch, failMode='standalone')
 
-        if sw == 2:
-            link = net.addLink(net.get('s5'), s_core, cls=TCLink, **hs1000)
-
         for i in range1(*topo_core[sw]):
             switchName = 's'+str(i)
             s = None
@@ -206,9 +203,6 @@ def treeNet(net, switches):
                         failMode='secure' if switchName in switches else
                         'standalone')
             link = net.addLink(s, s_core, cls=TCLink, **hs1000)
-
-        if sw == 4:
-            link = net.addLink(net.get('s17'), net.get('s3'), cls=TCLink, **hs1000)
 
     info( '*** Add access\n')
     for sw in topo_distro:
@@ -238,8 +232,7 @@ def treeNet(net, switches):
 
     i = 0
     while i < len(core_switches)-1:
-        if core_switches[i] == 2 and core_switches[i+1] == 3:
-            net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
+        net.addLink(net.get('s'+str(core_switches[i])), net.get('s'+str(core_switches[i+1])), cls=TCLink, **hs1000)
         i += 1
 
     info( '*** Starting network\n')
@@ -275,9 +268,13 @@ def treeNet(net, switches):
     info( '*** Post configure switches and hosts\n')
 
     for sub in topo_subnet:
-        count = 250
+        count = 251
+        j = 0
         for l in topo_subnet[sub]:
-            count += 1
+            j += 1
+            if j>2:
+                count += 2
+                j = 0
             for i in range1(*l):
                 hostName = 'h'+str(i)
                 h = net.get(hostName)
