@@ -320,9 +320,6 @@ def startTG(net):
     for i in range(len(hosts[0])):
         flag ^= 1
 
-        if i&1 == 0:
-            continue
-
         serv = net.get('h'+str(hosts[flag][i]))
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
