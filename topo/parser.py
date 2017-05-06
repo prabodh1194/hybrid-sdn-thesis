@@ -19,6 +19,36 @@ d = {}
 files = os.popen('ls -1 $HOME/prabodh/stat | grep "vlan\|s[0-9]\+-"').read()[:-1]
 files = files.split('\n')
 
+hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
+        [33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64]]
+flag = 0
+delay = "Average delay += +([0-9.]+) s"
+bitrate = "Average bitrate += +([0-9.]+) Kbit"
+drop = "Packets dropped += +([0-9]+) "
+host_ee = {}
+
+for i in range(len(hosts[0])):
+    flag ^= 1
+    cli = hosts[flag^1][i]
+    serv = hosts[flag][i]
+
+    k = 'h'+str(serv)
+    try:
+        ITG = os.popen('ITGDec $HOME/prabodh/stat/recv{0}.log|tail -15|grep -i "average\|drop"'.format(k)).read()
+        delay_s = float(re.search(delay, ITG).group(1))*1000
+        bitrate_mBps = float(re.search(bitrate, ITG).group(1))/(8*1024)
+        _drop = re.search(drop, ITG).group(1)
+        host_ee[k] = {'delay':delay_s,'bitrate':bitrate_mBps, 'drop': _drop}
+    except:
+        print k
+
+drop_file = open(os.path.expanduser('~')+'/prabodh/stat/drop','a')
+stdout = sys.stdout
+sys.stdout = drop_file
+print header
+pprint.pprint(host_ee)
+sys.stdout = stdout
+
 print >>sys.stderr, files
 
 for tcp_file in files:
@@ -85,63 +115,10 @@ f = open(TOPO_FILE)
 topo = json.load(f)
 
 traversal = {}
-hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
-        [33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64]]
-flag = 0
-delay = "Average delay += +([0-9.]+) s"
-bitrate = "Average bitrate += +([0-9.]+) Kbit"
-drop = "Packets dropped += +([0-9]+) "
-host_ee = {}
-
-for i in range(len(hosts[0])):
-    flag ^= 1
-    if i&1 == 0:
-        continue
-    cli = hosts[flag^1][i]
-    serv = hosts[flag][i]
-
-    #k = 'h'+str(cli)
-    #cli_k = '.'.join(topo[k][2].split('.')[2:])
-
-    ##construct traversal
-    #if cli_k not in traversal:
-    #    traversal[cli_k] = []
-
-    #while True:
-    #    if k not in topo:
-    #        break
-    #    traversal[cli_k] += ['{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1]))]
-    #    if topo[k][0] != 's1':
-    #        traversal[cli_k] += ['{0}-eth1'.format(str(topo[k][0]))]
-    #    k = topo[k][0]
-
-    #k = 'h'+str(serv)
-    #idx = len(traversal[cli_k])
-
-    #while True:
-    #    if k not in topo:
-    #        break
-    #    traversal[cli_k].insert(idx,'{0}-eth{1}'.format(str(topo[k][0]),str(topo[k][1])))
-    #    if topo[k][0] != 's1':
-    #        traversal[cli_k].insert(idx,'{0}-eth1'.format(str(topo[k][0])))
-    #    k = topo[k][0]
-
-    #construct end-to-end latency
-    k = 'h'+str(serv)
-    try:
-        ITG = os.popen('ITGDec $HOME/prabodh/stat/recv{0}.log|tail -15|grep -i "average\|drop"'.format(k)).read()
-        delay_s = float(re.search(delay, ITG).group(1))*1000
-        bitrate_mBps = float(re.search(bitrate, ITG).group(1))/(8*1024)
-        _drop = re.search(drop, ITG).group(1)
-        host_ee[k] = {'delay':delay_s,'bitrate':bitrate_mBps, 'drop': _drop}
-    except:
-        print k
 
 f_t = open('traversal','r')
 traversal = json.load(f_t)
 print >> sys.stderr, pprint.pformat(traversal)
-
-drop_file = open(os.path.expanduser('~')+'/prabodh/stat/drop','a')
 
 totalDrop = 0
 link_speed = {}
@@ -204,11 +181,9 @@ for link in link_speed:
 
 stdout = sys.stdout
 sys.stdout = drop_file
-print header
 # pprint.pprint(link_util)
 # pprint.pprint(link_bw)
 pprint.pprint(link_speed)
-pprint.pprint(host_ee)
 sys.stdout = stdout
 
 #for packet in d: # go through every recorded packet
