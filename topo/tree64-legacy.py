@@ -258,7 +258,7 @@ def startTG(net,name):
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
         serv.cmd('ITGRecv &')
-        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l ../../../stat/send{0}.log -x ../../../stat/recv{0}.log &'.format(str(serv)))
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
 
@@ -285,11 +285,11 @@ if __name__ == '__main__':
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
         router = net.get('s1')
 
         for i in router.intfs:
-            router.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w ../../../stat/{0} &'.format(str(router.intfs[i])))
+            router.cmd('tcpdump -s 50 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(router.intfs[i])))
         # for host in net.hosts:
         #     host.cmd('tcpdump src {1} or dst {1} and udp -w ../../../stat/{0} &'.format(str(host),host.IP()))
 
