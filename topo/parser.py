@@ -130,6 +130,8 @@ link_latency = {}
 i = 0
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
+        if host == '':
+            break
         i = 0
         if host == '':
             break
