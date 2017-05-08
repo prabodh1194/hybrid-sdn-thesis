@@ -51,6 +51,7 @@ sys.stdout = stdout
 
 print >>sys.stderr, files
 
+size = 0
 for tcp_file in files:
     f = open(os.path.expanduser('~')+'/prabodh/stat/'+tcp_file, 'r')
     print >>sys.stderr, tcp_file
@@ -129,6 +130,8 @@ link_latency = {}
 i = 0
 for packet in d: # go through every recorded packet
     for host in d[packet]: # for every packet, go through every host
+        if host == '':
+            break
         i = 0
         while i < len(traversal[host])-1: # for a host, go through all interfaces in order
             intf = traversal[host][i]

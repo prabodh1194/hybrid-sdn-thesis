@@ -3,8 +3,8 @@ import os
 
 os.system('sudo mn -c')
 
-# combo = ['s5 s9 s13 s17']
-combo = [' ']
+combo = ['s5 s9 s13 s17']
+# combo = [' ']
 
 for s in combo:
     os.system('python tree64-legacy.py -t -s {0}'.format(s))
