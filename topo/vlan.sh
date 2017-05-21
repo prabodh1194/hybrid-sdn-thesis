@@ -20,6 +20,10 @@ sudo ovs-vsctl del-port s1 s1-eth1
 sudo ovs-vsctl add-port s1 s1-eth1 trunks=1,2,3,4
 sudo ovs-vsctl del-port s5 s5-eth1
 sudo ovs-vsctl add-port s5 s5-eth1 trunks=1,2,3,4
+sudo ovs-vsctl del-port s2 s2-eth1
+sudo ovs-vsctl add-port s2 s2-eth1 trunks=1,2,3,4
+sudo ovs-vsctl del-port s9 s9-eth1
+sudo ovs-vsctl add-port s9 s9-eth1 trunks=1,2,3,4
 sudo ovs-vsctl del-port s3 s3-eth1
 sudo ovs-vsctl add-port s3 s3-eth1 trunks=1,2,3,4
 sudo ovs-vsctl del-port s13 s13-eth1
@@ -34,14 +38,14 @@ sudo ifconfig vlan12 10.0.2.251/24
 sudo ifconfig vlan13 10.0.3.251/24
 sudo ifconfig vlan14 10.0.4.251/24
 
-# sudo ovs-vsctl add-port s2 vlan21 tag=1 -- set interface vlan21 type=internal
-# sudo ovs-vsctl add-port s2 vlan22 tag=2 -- set interface vlan22 type=internal
-# sudo ovs-vsctl add-port s2 vlan23 tag=3 -- set interface vlan23 type=internal
-# sudo ovs-vsctl add-port s2 vlan24 tag=4 -- set interface vlan24 type=internal
-# sudo ifconfig vlan21 10.0.1.252/24
-# sudo ifconfig vlan22 10.0.2.252/24
-# sudo ifconfig vlan23 10.0.3.252/24
-# sudo ifconfig vlan24 10.0.4.252/24
+sudo ovs-vsctl add-port s2 vlan21 tag=1 -- set interface vlan21 type=internal
+sudo ovs-vsctl add-port s2 vlan22 tag=2 -- set interface vlan22 type=internal
+sudo ovs-vsctl add-port s2 vlan23 tag=3 -- set interface vlan23 type=internal
+sudo ovs-vsctl add-port s2 vlan24 tag=4 -- set interface vlan24 type=internal
+sudo ifconfig vlan21 10.0.1.252/24
+sudo ifconfig vlan22 10.0.2.252/24
+sudo ifconfig vlan23 10.0.3.252/24
+sudo ifconfig vlan24 10.0.4.252/24
  
 sudo ovs-vsctl add-port s3 vlan31 tag=1 -- set interface vlan31 type=internal
 sudo ovs-vsctl add-port s3 vlan32 tag=2 -- set interface vlan32 type=internal

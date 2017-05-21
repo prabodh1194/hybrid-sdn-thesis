@@ -1,13 +1,17 @@
 ip rule add to 10.0.4.251 lookup local pref 0
+ip rule add to 10.0.4.252 lookup local pref 0
 ip rule add to 10.0.4.253 lookup local pref 0
 
 ip rule add to 10.0.3.251 lookup local pref 0
+ip rule add to 10.0.3.252 lookup local pref 0
 ip rule add to 10.0.3.253 lookup local pref 0
 
 ip rule add to 10.0.2.251 lookup local pref 0
+ip rule add to 10.0.2.252 lookup local pref 0
 ip rule add to 10.0.2.253 lookup local pref 0
 
 ip rule add to 10.0.1.251 lookup local pref 0
+ip rule add to 10.0.1.252 lookup local pref 0
 ip rule add to 10.0.1.253 lookup local pref 0
 
 ip rule add from 10.0.1.0/24 iif vlan11 lookup 2 pref 1
@@ -18,6 +22,15 @@ ip rule add iif vlan11 lookup 6 pref 2
 ip rule add iif vlan12 lookup 6 pref 2
 ip rule add iif vlan13 lookup 6 pref 2
 ip rule add iif vlan14 lookup 6 pref 2
+
+ip rule add from 10.0.1.0/24 iif vlan21 lookup 3 pref 1
+ip rule add from 10.0.2.0/24 iif vlan22 lookup 3 pref 1
+ip rule add from 10.0.3.0/24 iif vlan23 lookup 3 pref 1
+ip rule add from 10.0.4.0/24 iif vlan24 lookup 3 pref 1
+ip rule add iif vlan21 lookup 7 pref 2
+ip rule add iif vlan22 lookup 7 pref 2
+ip rule add iif vlan23 lookup 7 pref 2
+ip rule add iif vlan24 lookup 7 pref 2
 
 ip rule add from 10.0.1.0/24 iif vlan31 lookup 4 pref 1
 ip rule add from 10.0.2.0/24 iif vlan32 lookup 4 pref 1

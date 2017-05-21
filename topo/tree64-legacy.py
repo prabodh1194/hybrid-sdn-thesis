@@ -268,13 +268,10 @@ def treeNet(net, switches):
     info( '*** Post configure switches and hosts\n')
 
     for sub in topo_subnet:
-        count = 251
-        j = 0
+        count = 250
         for l in topo_subnet[sub]:
-            j += 1
-            if j>2:
-                count += 2
-                j = 0
+            if count<253:
+                count += 1
             for i in range1(*l):
                 hostName = 'h'+str(i)
                 h = net.get(hostName)
