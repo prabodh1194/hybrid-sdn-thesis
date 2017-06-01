@@ -24,23 +24,24 @@ def back(topo):
             topo_back[i] = k
     return topo_back
 
-topo_vlan = {1:[5,9,13,17],2:[6,10,14,18],3:[7,12,15,19],4:[8,12,16,20]}
+topo_vlan = {1:[6,10,14,18,22],2:[7,11,15,19,23],3:[8,13,16,20,24],4:[9,13,17,21,25]}
 
 topo_vlan_back = {}
 for vlan in topo_vlan:
     for i in topo_vlan[vlan]:
         topo_vlan_back[i] = topo_vlan_back.get(i,[]) + [vlan]
 
-topo_core = {1:[5,8],2:[9,12],3:[13,16],4:[17,20]}
-topo_distro = {5:[21,22],6:[23,24],7:[25,26],8:[27,28],9:[29,30],10:[31,32],11:[33,34],12:[35,36],13:[37,38],14:[39,40],15:[41,42],16:[43,44],17:[45,46],18:[47,48],19:[49,50],20:[51,52]}
-topo_access = {21: [1, 2], 22: [3, 4], 23: [5, 6], 24: [7, 8], 25: [9, 10], 26:
-        [11, 12], 27: [13, 14], 28: [15, 16], 29: [17, 18], 30: [19, 20], 31:
-        [21, 22], 32: [23, 24], 33: [25, 26], 34: [27, 28], 35: [29, 30], 36:
-        [31, 32], 37: [33, 34], 38: [35, 36], 39: [37, 38], 40: [39, 40], 41:
-        [41, 42], 42: [43, 44], 43: [45, 46], 44: [47, 48], 45: [49, 50], 46:
-        [51, 52], 47: [53, 54], 48: [55, 56], 49: [57, 58], 50: [59, 60], 51:
-        [61, 62], 52: [63, 64]}
-topo_subnet = {1:[[1,4],[17,20],[33,36],[49,52]],2:[[5,8],[21,24],[37,40],[53,56]],3:[[9,12],[25,28],[41,44],[57,60]],4:[[13,16],[29,32],[45,48],[61,64]]}
+topo_core = {1:[6,9],2:[10,13],3:[14,17],4:[18,21],5:[22,25]}
+topo_distro = {6:[26,27],7:[28,29],8:[30,31],9:[32,33],10:[34,35],11:[36,37],12:[38,39],13:[40,41],14:[42,43],15:[44,45],16:[46,47],17:[48,49],18:[50,51],19:[52,53],20:[54,55],21:[56,57],22:[58,59],23:[60,61],24:[62,63],25:[64,65]}
+topo_access = {26: [1, 2], 27: [3, 4], 28: [5, 6], 29: [7, 8], 30: [9, 10], 31:
+        [11, 12], 32: [13, 14], 33: [15, 16], 34: [17, 18], 35: [19, 20], 36:
+        [21, 22], 37: [23, 24], 38: [25, 26], 39: [27, 28], 40: [29, 30], 41:
+        [31, 32], 42: [33, 34], 43: [35, 36], 44: [37, 38], 45: [39, 40], 46:
+        [41, 42], 47: [43, 44], 48: [45, 46], 49: [47, 48], 50: [49, 50], 51:
+        [51, 52], 52: [53, 54], 53: [55, 56], 54: [57, 58], 55: [59, 60], 56:
+        [61, 62], 57: [63, 64], 58: [65, 66], 59: [67, 68], 60: [69, 70], 61:
+        [71, 72], 62: [73, 74], 63: [75, 76], 64: [77, 78], 65: [79, 80]}
+topo_subnet = {1:[[1,4],[17,20],[33,36],[49,52],[65,68]],2:[[5,8],[21,24],[37,40],[53,56],[69,72]],3:[[9,12],[25,28],[41,44],[57,60],[73,76]],4:[[13,16],[29,32],[45,48],[61,64],[77,80]]}
 
 topo_core_back = back(topo_core)
 topo_distro_back = back(topo_distro)
@@ -69,89 +70,6 @@ def close(switch, switches):
         if s>=switch:
             return s
     return switches[-1]
-
-def generateFlows(net,topo,switches):
-
-    subs = topo_subnet.keys()
-    sdn_switch = [int(s[1:]) for s in switches]
-    sdn_switch.sort()
-    flow = 'sudo ovs-ofctl -O OpenFlow13 add-flow {0} ip,nw_dst={1},priority={2}{3},actions=set_field:{4}"->"eth_dst,mod_vlan_vid:{5},{6}'
-
-    flows = {}
-    f = open("flows","w")
-    stdout = sys.stdout
-    sys.stdout = open(FLOW_FILE, 'w+')
-    if len(switches) == 0:
-        return
-
-    for i in subs:
-        sw_i = i+1
-        for j in subs:
-            sw_j = j+1
-
-            if i == j:
-                if sw_i in sdn_switch:
-                    hosts = topo_subnet[i]
-                    for l in hosts:
-                        for h in range1(*l):
-                            host = 'h'+str(h)
-                            intf = topo[topo[host][0]][1]
-                            print flow.format('s'+str(sw_i),topo[host][2],3,',in_port='+intf,net.get(host).MAC(),topo[host][2].split('.')[2],'set_field:{0}"->"eth_src,IN_PORT'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC()))
-                            print flow.format('s'+str(sw_i),topo[host][2],2,'',net.get(host).MAC(),topo[host][2].split('.')[2],'set_field:{0}"->"eth_src,output:{1}'.format(net.get('s'+str(sw_i)).intfs[int(intf)].MAC(),intf))
-                else:
-                    switch = str(close(sw_i, sdn_switch))
-                    flows[str(i)+'-'+str(j)] = switch
-                    router = topo['s'+switch]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),i,'IN_PORT')
-            else:
-                if sw_i not in sdn_switch and sw_j not in sdn_switch:
-                    switch = str(close(sw_i, sdn_switch))
-                    flows[str(i)+'-'+str(j)] = switch
-                    router = topo['s'+switch]
-                    print flow.format('s'+switch,'10.0.{0}.1/24'.format(i),2,',in_port=1',net.get(router[0]).intfs[int(router[1])-1].MAC(),i,'IN_PORT')
-
-    print '>&2 printf "%.2f%%\r" ',(100.0*1/100)
-    print '>&2 echo'
-    sys.stdout = stdout
-
-    json.dump(flows, f)
-    f.close()
-
-    f = open("pbr.sh","w")
-    f.write("""
-ip rule del table local
-ip rule add pref 32765 table local
-ip rule add to 10.0.1.1 pref 0 table local
-ip rule add to 10.0.2.1 pref 0 table local
-ip rule add to 10.0.3.1 pref 0 table local
-ip rule add to 10.0.4.1 pref 0 table local
-""")
-
-    # policies are written such that, packets meant for one particular intf are
-    # written on that table
-    # e.g., outs for intf s1-eth1 are written to table 2.
-    for dist in topo_core:
-        fanout = len(range1(*topo_core[dist]))
-        for i in range(fanout): # table - intf
-            for j in range(fanout): # subnet
-                f.write('ip route add 10.0.{0}.0/24 table {1} proto kernel scope link dev s{2}-eth{3}\n'.format(j+1,i+2,dist,i+1))
-
-    for fl in flows:
-        sub_src = fl.split('-')[0]
-        sub_dst = fl.split('-')[1]
-        sw_src = int(sub_src)+1
-        sw_dst = int(sub_dst)+1
-        sub_src = '10.0.{0}.0/24'.format(sub_src)
-        sub_dst = '10.0.{0}.0/24'.format(sub_dst)
-        intf = flows[fl]
-
-        if sw_src not in switches and sw_dst not in switches:
-            f.write('ip rule add to {0} from {1} dev s1-eth{2} pref 1 table {3}\n'.format(sub_dst,sub_src,sub_src.split('.')[2],intf))
-
-    f.close()
-
-    os.system('cat pbr.sh')
-    # net.get('s1').cmd('sh pbr.sh')
 
 def printTopoDS(net,switches):
     topo = {}
@@ -280,7 +198,7 @@ def treeNet(net, switches):
     #configure VLANs
     vlans = [1,1,2,2,3,3,4,4]
     c = 0
-    for i in range1(21,52):
+    for i in range1(26,65):
         sw = net.get('s'+str(i))
         for inf in sw.intfs:
             intf = sw.intfs[inf]
@@ -313,8 +231,8 @@ def treeNet(net, switches):
 def startTG(net):
     'Traffic generation'
 
-    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],
-            [33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64]]
+    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+            [41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80]]
     flag = 0
 
     for i in range(len(hosts[0])):
@@ -323,12 +241,12 @@ def startTG(net):
         serv = net.get('h'+str(hosts[flag][i]))
         cli  = net.get('h'+str(hosts[flag^1][i]))
 
-        print cli,'->',serv
+        print cli,cli.IP(),'->',serv,serv.IP()
 
         serv.cmd('ping -c1 {0}'.format(cli.IP()))
 
         serv.cmd('ITGRecv &')
-        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 10000 -C 2560 -c 4096 -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
+        cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -t 120000 -C 2560 -c 4096 -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
         # cli.cmd('sleep 2 && ITGSend -T UDP -a '+serv.IP()+' -z 12648 -Fs ps -Ft idts -l $HOME/prabodh/stat/send{0}.log -x $HOME/prabodh/stat/recv{0}.log &'.format(str(serv)))
 
 if __name__ == '__main__':
@@ -353,15 +271,17 @@ if __name__ == '__main__':
     treeNet(net, set(args.switches))
 
     os.system('sh vlan.sh')
-    os.system('bash route.sh')
+    os.system('bash clear.sh')
+    if len(args.switches) != 0:
+        os.system('bash conff')
 
     if args.stats:
         for switch in net.switches:
             for i in switch.intfs:
-                switch.cmd('tcpdump -s 54 -B 102400 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
+                switch.cmd('tcpdump -s 54 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
         for i in range(1,6):
             for j in range(1,5):
-                os.system('tcpdump -s 54 -B 102400 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
+                os.system('tcpdump -s 54 -B 65536 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
 
     os.system('sh flow.sh')
 

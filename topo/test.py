@@ -2,12 +2,13 @@
 import os
 
 os.system('sudo mn -c')
+os.system('sudo stop network-manager')
 
-combo = ['s5']
-# combo = [' ']
+# combo = ['s5']
+combo = [' ']
 
 for s in combo:
-    os.system('python tree64-legacy.py -t -s {0}'.format(s))
+    os.system('python tree64-legacy.py -s {0}'.format(s))
     os.system('cd $HOME/prabodh/stat/ && ls -1 | grep "vlan\|s[0-9]\+-" | while read var; do sudo tcpdump -eqns 0 -X -r $var > s$var; rm -f $var; done')
     os.system('pwd')
     os.system('python parser.py {0} >> $HOME/prabodh/stat/pack_info'.format(s.replace(' ',',')))
