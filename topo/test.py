@@ -4,7 +4,7 @@ import os
 os.system('sudo mn -c')
 os.system('sudo stop network-manager')
 
-combo = ['s14', ' ']
+combo = ['s14 s18', ' ']
 
 for s in combo:
     os.system('python tree64-legacy.py -t -s {0}'.format(s))

@@ -185,15 +185,17 @@ def treeNet(net, switches):
 
     info( '*** Post configure switches and hosts\n')
 
+    subs = [252,252,252,253,253]
+    c = -1
     for sub in topo_subnet:
-        count = 253
+        c += 1
         for l in topo_subnet[sub]:
             for i in range1(*l):
                 hostName = 'h'+str(i)
                 h = net.get(hostName)
-                h.cmd('sudo route add default gw 10.0.{0}.{1} h{2}-eth0'.format(sub,count,i))
+                h.cmd('sudo route add default gw 10.0.{0}.{1} h{2}-eth0'.format(sub,subs[c],i))
                 if len(switches) != 0:
-                    h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub,i))
+                    h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub))
 
     #configure VLANs
     vlans = [1,1,2,2,3,3,4,4]
