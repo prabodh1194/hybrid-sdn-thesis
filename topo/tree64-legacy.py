@@ -17,6 +17,9 @@ import os,sys,argparse,re,time,json,pdb
 
 range1 = lambda start, end: range(start, end+1)
 
+hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+        [41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80]]
+
 def back(topo):
     topo_back = {}
     for k in topo:
@@ -200,6 +203,8 @@ def treeNet(net, switches):
     #configure VLANs
     vlans = [1,1,2,2,3,3,4,4]
     c = 0
+
+    #configure access ports & distibution switch VLANs
     for i in range1(26,65):
         sw = net.get('s'+str(i))
         for inf in sw.intfs:
@@ -214,7 +219,7 @@ def treeNet(net, switches):
                 os.system('sudo ovs-vsctl add-port {0} {1} tag={2}'.format(sw1,intf.link.intf2,vlans[c]))
         c = (c+1)%8
 
-    #configure trunk
+    #configure VLANs between distibution switch and core switch
     for s in topo_vlan_back:
         sw = net.get('s'+str(s))
         for inf in sw.intfs:
@@ -228,13 +233,126 @@ def treeNet(net, switches):
                 os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
                 os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,','.join(map(str,topo_vlan_back[s]))))
 
-    # generateFlows(net,topo,switches)
+    #configure VLANs between core switches
+    for s in topo_core:
+        sw = net.get('s'+str(s))
+        for inf in sw.intfs:
+            intf = sw.intfs[inf]
+            if str(sw) in str(intf.link.intf1):
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(str(sw),intf,','.join(map(str,topo_vlan_back[s]))))
+                sw1 = str(intf.link.intf2).split('-')[0]
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,'1,2,3,4'))
+
+    #configure VLANs between core switch and SDN-distribution switch
+    for s in switches:
+        sw = net.get(s)
+        for inf in sw.intfs:
+            intf = sw.intfs[inf]
+            if str(sw) in str(intf.link.intf1):
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(str(sw),intf))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(str(sw),intf,'1,2,3,4'))
+                sw1 = str(intf.link.intf2).split('-')[0]
+                os.system('sudo ovs-vsctl del-port {0} {1}'.format(sw1,intf.link.intf2))
+                os.system('sudo ovs-vsctl add-port {0} {1} trunks={2}'.format(sw1,intf.link.intf2,'1,2,3,4'))
+
+    generateFlows(net,topo,switches)
+
+def generateFlows(net,topo,switches):
+
+    conff = open('conff','w')
+    vlan_sh = open('vlan.sh','w')
+    route_sh = open('route.sh','w')
+
+    core_switches = set()
+    sdn_switch = switches[0]
+    core_switch = topo[sdn_switch][0]
+    core_switches.add(core_switch)
+    sdn_vlans = {sdn_switch:set()} # list of subnets being diverted to given SDN switch
+
+    for i in range1(0,1):
+        j = i
+        while j < len(hosts):
+            h = hosts[i][j]
+            h = 'h'+str(h)
+            j += 2
+            s_dst = topo[topo[h][0]] #distribution switch
+            if s_dst in switches:
+                sdn_switch = s_dst
+                sdn_vlans[sdn_switch] = set()
+                core_switch = topo[sdn_switch][0]
+                core_switches.add(core_switch)
+            sdn_vlans[sdn_switch].add(topo_vlan_back[int(s_dst[1:])])
+
+    rule_1_route = "ip route add 10.0.{0}.0/24 dev {1}-eth{2} table {3} proto static scope link"
+    for sw in sdn_vlans:
+        for v in sdn_vlans[sw]:
+            route_sh.write(rule_1_route.format(v,sw,topo[sw][1],int(topo[sw][1][1:])+1))
+
+    for sw in core_switches:
+        rule_0 = "ip rule add to 10.0.{0}.25{1} lookup local pref 0"
+        rule_1 = "ip rule add from 10.0.{0}.0/24 iif vlan{1}{0} lookup {2} pref 1"
+        rule_2 = "ip rule add iif vlan{0}{1} lookup {2} pref 2"
+        rule_2_route= "ip route add 10.0.{0}.0/24 dev vlan{1}{0} table {2} proto static scope link"
+        vlan_conf_add = "sudo ovs-vsctl add-port s{0} vlan{0}{1} tag={1} -- set interface vlan{0}{1} type=internal"
+        vlan_conf_ip = "sudo ifconfig vlan{0}{1} 10.0.{1}.25{2}/24"
+
+        s = int(sw[1:])
+
+        for i in range1(1,4):
+            conff.write(rule_0.format(i,s-1))
+            vlan_sh.write(vlan_conf_add.format(s,i))
+        conff.write('\n')
+        for i in range1(1,4):
+            conff.write(rule_1.format(i,s,s+1))
+            vlan_sh.write(vlan_conf_ip.format(s,i,s-1))
+        conff.write('\n')
+        for i in range1(1,4):
+            conff.write(rule_2.format(s,i,s+6))
+            route_sh.write(rule_2_route.format(i,s,s+6))
+        conff.write('\n')
+
+    conff.write('bash route.sh')
+
+    route_sh.write('''ifconfig | grep "s[1-5]-eth1\|vlan.[12345]"|sed "s/-//"|sed "s/   Link encap:Ethernet  HWaddr//"|sed "s/  */=/" > macs
+. $PWD/macs
+for i in {1..4}; do for j in {1..20}; do for k in {1..5}; do for l in {1..4}; do
+    sudo arp -s 10.0.$i.$j 10:00:00:00:00:01 -i s$k-eth$l; done; done; done;
+done;''')
+
+    f1 = "sudo ovs-ofctl -OOpenFlow13 add-flow {0} ip,priority={1},nw_dst={2},{3},actions=strip_vlan,set_field:{4}\"->\"eth_dst,set_field:$vlan{5}{6}\"->\"eth_src,{7}"
+    f2 = "sudo ovs-ofctl -OOpenFlow13 add-flow {0} ip,priority={1},nw_src=10.0.{2}.0/24,{3},actions=mod_vlan_vid:{4},set_field:vlan{5}{4}\"->\"eth_dst,set_field:$s{5}eth{4}\"->\"eth_src,{6}"
+
+    ports=[2,2,3,3]
+    vlans=[4,1,2,3]
+    ports = [str(x) for x in ports]
+    for sw in sdn_vlans:
+        route_sh.write('\n')
+        s = int(sw[1:])
+        hh = []
+        for a in range1(*topo_distro[s])
+            hh += topo_access[a]
+        j = 0
+        for h in hh:
+            route_sh.write(f1.format(sw,4,net.get('h'+str(h)).IP(),"in_port"+ports[j],net.get('h'+str(h)).MAC(),topo[sw][0][1:],topo_vlan_back[s],"IN_PORT"))
+            route_sh.write(f1.format(sw,3,net.get('h'+str(h)).IP(),"",net.get('h'+str(h)).MAC(),topo[sw][0][1:],topo_vlan_back[s],"output:"+ports[j]))
+            j+=1
+
+        j = 0
+        for i in range1(1,4):
+            route_sh.write(f2.format(sw,2,i,"in_port=5",vlans[j],topo[sw][0][1:],"IN_PORT"))
+            route_sh.write(f2.format(sw,2,i,"",vlans[j],topo[sw][0][1:],"output:5"))
+        j+=1
+
+    conff.close()
+    vlan_sh.close()
+    route_sh.close()
+    return 1
 
 def startTG(net):
     'Traffic generation'
 
-    hosts = [[1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
-            [41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80]]
     flag = 0
 
     for i in range(len(hosts[0])):
