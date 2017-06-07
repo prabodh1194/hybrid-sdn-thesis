@@ -189,7 +189,6 @@ def treeNet(net, switches):
     info( '*** Post configure switches and hosts\n')
 
     subs = generateFlows(net,topo,list(switches))
-    print >> sys.stderr, subs
 
     for sub in topo_subnet:
         c = -1
@@ -199,7 +198,6 @@ def treeNet(net, switches):
                 hostName = 'h'+str(i)
                 h = net.get(hostName)
                 h.cmd('sudo route add default gw 10.0.{0}.{1} h{2}-eth0'.format(sub,subs[c],i))
-                print>>sys.stderr,'sudo route add default gw 10.0.{0}.{1} h{2}-eth0'.format(sub,subs[c],i)
                 if len(switches) != 0:
                     h.cmd('sudo ip route del 10.0.{0}.0/24 table main'.format(sub))
 
@@ -274,12 +272,15 @@ def generateFlows(net,topo,switches):
     conff = open('conff','w')
     vlan_sh = open('vlan.sh','w')
     route_sh = open('route.sh','w')
+    trav = open('traversal','w')
 
     core_switches = set()
     sdn_switch = switches[0]
     core_switch = topo[sdn_switch][0]
     core_switches.add(core_switch)
     sdn_vlans = {sdn_switch:set()} # list of subnets being diverted to given SDN switch
+
+    traversal = {}
 
     for i in range1(0,1):
         j = i
@@ -294,6 +295,15 @@ def generateFlows(net,topo,switches):
                 core_switch = topo[sdn_switch][0]
                 core_switches.add(core_switch)
             sdn_vlans[sdn_switch].add(*topo_vlan_back[int(s_dst[1:])])
+            ip = net.get(h).IP()
+            ip = '.'.join(ip.split('.')[2:])
+            
+            if s_dst == sdn_switch:
+                traversal[ip] = [s_dst+"-eth1",topo[s_dst][0]+"-eth"+topo[s_dst][1]]
+            else:
+                traversal[ip] = [topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1],sdn_switch+"-eth1",sdn_switch+"-eth1",topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1]]
+
+    json.dump(traversal, trav, indent = 4, sort_keys=True)
 
     rule_1_route = "\nip route add 10.0.{0}.0/24 dev {1}-eth{2} table {3} proto static scope link"
     for sw in sdn_vlans:
@@ -356,6 +366,7 @@ done;\n''')
     conff.close()
     vlan_sh.close()
     route_sh.close()
+    trav.close()
 
     core_switches = [int(s[1:]) for s in core_switches]
     core_switches.sort()
@@ -417,24 +428,24 @@ if __name__ == '__main__':
         os.system('bash conff')
 
     if args.stats:
-        for switch in net.switches:
-            for i in switch.intfs:
-                switch.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
-        for i in range(1,6):
-            for j in range(1,5):
-                os.system('tcpdump -s 58 -B 65536 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
-        for h in net.hosts:
-            h.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0}-eth0 net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(h)))
-        #for switch in args.switches:
-        #    sw = net.get(switch)
-        #    for inf in sw.intfs:
-        #        intf = sw.intfs[inf]
-        #        if 'lo' in str(intf):
-        #            continue
-        #        sw.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf)))
-        #        if str(sw) in str(intf.link.intf1):
-        #            sw1 = str(intf.link.intf2).split('-')[0]
-        #            net.get(sw1).cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf.link.intf2)))
+        #for switch in net.switches:
+        #    for i in switch.intfs:
+        #        switch.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
+        #for i in range(1,6):
+        #    for j in range(1,5):
+        #        os.system('tcpdump -s 58 -B 65536 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
+        #for h in net.hosts:
+        #    h.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0}-eth0 net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(h)))
+        for switch in args.switches:
+            sw = net.get(switch)
+            for inf in sw.intfs:
+                intf = sw.intfs[inf]
+                if 'lo' in str(intf):
+                    continue
+                sw.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf)))
+                if str(sw) in str(intf.link.intf1):
+                    sw1 = str(intf.link.intf2).split('-')[0]
+                    net.get(sw1).cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf.link.intf2)))
 
     if args.cli:
         CLI(net)
