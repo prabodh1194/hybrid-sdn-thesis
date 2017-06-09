@@ -335,7 +335,7 @@ def generateFlows(net,topo,switches):
 
     conff.write('\nbash route.sh')
 
-    route_sh.write('''\nifconfig | grep "s[1-5]-eth1\|vlan.[12345]"|sed "s/-//"|sed "s/   Link encap:Ethernet  HWaddr//"|sed "s/  */=/" > macs
+    route_sh.write('''\nifconfig | grep "s[1-5]-eth[1-6]\|vlan.[12345]"|sed "s/-//"|sed "s/   Link encap:Ethernet  HWaddr//"|sed "s/  */=/" > macs
 . $PWD/macs
 for i in {1..4}; do for j in {1..20}; do for k in {1..5}; do for l in {1..4}; do
     sudo arp -s 10.0.$i.$j 10:00:00:00:00:01 -i s$k-eth$l; done; done; done;
