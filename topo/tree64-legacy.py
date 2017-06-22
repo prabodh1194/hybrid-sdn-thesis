@@ -283,11 +283,10 @@ def generateFlows(net,topo,switches):
     traversal = {}
 
     for i in range1(0,1):
-        j = i
+        j = i #select only clients
         while j < len(hosts[i]):
             h = hosts[i][j]
             h = 'h'+str(h)
-            j += 2
             s_dst = topo[topo[h][0]][0] #distribution switch
             if s_dst in switches and s_dst is not sdn_switch:
                 sdn_switch = s_dst
@@ -297,11 +296,62 @@ def generateFlows(net,topo,switches):
             sdn_vlans[sdn_switch].add(*topo_vlan_back[int(s_dst[1:])])
             ip = net.get(h).IP()
             ip = '.'.join(ip.split('.')[2:])
-            
-            if s_dst == sdn_switch:
-                traversal[ip] = [s_dst+"-eth1",topo[s_dst][0]+"-eth"+topo[s_dst][1]]
+
+            k = h
+
+            print k,ip
+
+            traversal[ip] = [topo[k][0]+"-eth"+topo[k][1]]
+            k = topo[k][0]
+            while 1:
+                traversal[ip] += [k+"-eth1",topo[k][0]+"-eth"+topo[k][1]]
+                k = topo[k][0]
+                if int(k[1:]) in topo_core:
+                    break
+
+            s_1 = k
+            s_1 = int(s_1[1:])
+            k = 'h'+str(hosts[i^1][j])
+
+            if s_dst != sdn_switch and topo[topo[k][0]][0] != sdn_switch:
+                s_2 = int(topo[sdn_switch][0][1:])
+                l = 0
+
+                if s_1 < s_2:
+                    while s_1 < s_2:
+                        traversal[ip] += ['s'+str(s_1)+'-eth'+ ('5' if s_1 == 1 else '6'),'s'+str(s_1+1)+'-eth5']
+                        s_1 += 1
+                else:
+                    while s_1 > s_2:
+                        traversal[ip] += ['s'+str(s_1)+'-eth5','s'+str(s_1-1)+'-eth'+ ('5' if s_1-1 == 1 else '6')]
+                        s_1 -= 1
+
+                traversal[ip] += [topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1],sdn_switch+"-eth1",sdn_switch+"-eth1",topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1]]
+                s_1 = s_2
+
+            temp_traversal = [topo[k][0]+"-eth"+topo[k][1]]
+            k = topo[k][0]
+            while 1:
+                temp_traversal += [k+"-eth1",topo[k][0]+"-eth"+topo[k][1]]
+                k = topo[k][0]
+                if int(k[1:]) in topo_core:
+                    break
+
+            s_2 = k
+            s_2 = int(s_2[1:])
+
+            if s_1 < s_2:
+                while s_1 < s_2:
+                    traversal[ip] += ['s'+str(s_1)+'-eth'+ ('5' if s_1 == 1 else '6'),'s'+str(s_1+1)+'-eth5']
+                    s_1 += 1
             else:
-                traversal[ip] = [topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1],sdn_switch+"-eth1",sdn_switch+"-eth1",topo[sdn_switch][0]+"-eth"+topo[sdn_switch][1]]
+                while s_1 > s_2:
+                    traversal[ip] += ['s'+str(s_1)+'-eth5','s'+str(s_1-1)+'-eth'+ ('5' if s_1-1 == 1 else '6')]
+                    s_1 -= 1
+
+            temp_traversal.reverse()
+            traversal[ip] += temp_traversal
+            j += 2
 
     json.dump(traversal, trav, indent = 4, sort_keys=True)
 
