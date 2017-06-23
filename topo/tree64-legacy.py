@@ -299,8 +299,6 @@ def generateFlows(net,topo,switches):
 
             k = h
 
-            print k,ip
-
             traversal[ip] = [topo[k][0]+"-eth"+topo[k][1]]
             k = topo[k][0]
             while 1:
