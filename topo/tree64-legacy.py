@@ -476,24 +476,24 @@ if __name__ == '__main__':
         os.system('bash conff')
 
     if args.stats:
-        #for switch in net.switches:
-        #    for i in switch.intfs:
-        #        switch.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
-        #for i in range(1,6):
-        #    for j in range(1,5):
-        #        os.system('tcpdump -s 58 -B 65536 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
+        for switch in net.switches:
+            for i in switch.intfs:
+                switch.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(switch.intfs[i])))
+        for i in range(1,6):
+            for j in range(1,5):
+                os.system('tcpdump -s 58 -B 65536 -nS -XX -i vlan{0}{1} net 10.0.0.0/16 -w $HOME/prabodh/stat/vlan{0}{1} &'.format(j,i))
         #for h in net.hosts:
         #    h.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0}-eth0 net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(h)))
-        for switch in args.switches:
-            sw = net.get(switch)
-            for inf in sw.intfs:
-                intf = sw.intfs[inf]
-                if 'lo' in str(intf):
-                    continue
-                sw.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf)))
-                if str(sw) in str(intf.link.intf1):
-                    sw1 = str(intf.link.intf2).split('-')[0]
-                    net.get(sw1).cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf.link.intf2)))
+        #for switch in args.switches:
+        #    sw = net.get(switch)
+        #    for inf in sw.intfs:
+        #        intf = sw.intfs[inf]
+        #        if 'lo' in str(intf):
+        #            continue
+        #        sw.cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf)))
+        #        if str(sw) in str(intf.link.intf1):
+        #            sw1 = str(intf.link.intf2).split('-')[0]
+        #            net.get(sw1).cmd('tcpdump -s 58 -B 65536 -nS -XX -i {0} net 10.0.0.0/16 -w $HOME/prabodh/stat/{0} &'.format(str(intf.link.intf2)))
 
     if args.cli:
         CLI(net)

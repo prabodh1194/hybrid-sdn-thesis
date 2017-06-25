@@ -108,7 +108,8 @@ for packet in d: # go through every recorded packet
                 z += [(i[0]-min_seconds,i[1])]
             d[packet][host][intf] = z
 
-# pprint.pprint(d)
+print header
+pprint.pprint(d)
 TOPO_FILE = 'topo_tree_adj_list'
 FLOW_FILE = 'flows'
 
